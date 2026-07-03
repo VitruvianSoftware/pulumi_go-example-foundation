@@ -19,9 +19,9 @@ package main
 import (
 	"fmt"
 
-	ghactions "github.com/pulumi/pulumi-github/sdk/v6/go/github"
 	libcicd "github.com/VitruvianSoftware/pulumi-library/go/pkg/cicd"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/serviceaccount"
+	ghactions "github.com/pulumi/pulumi-github/sdk/v6/go/github"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -77,7 +77,7 @@ func deployGitHubActionsBuild(ctx *pulumi.Context, cfg *Config, seed *SeedProjec
 		var attr string
 		if repo == "" || repo == "*" {
 			// Wildcard: any repo under this owner
-			attr = fmt.Sprintf("attribute.repository/%s", cfg.GitHubOwner)
+			attr = fmt.Sprintf("attribute.repository_owner/%s", cfg.GitHubOwner)
 		} else {
 			// Specific repo binding
 			attr = fmt.Sprintf("attribute.repository/%s/%s", cfg.GitHubOwner, repo)

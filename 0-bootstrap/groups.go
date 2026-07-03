@@ -29,9 +29,10 @@ import (
 // Groups are only created when create_required_groups or create_optional_groups
 // is set to true in the config. When disabled, the bootstrap assumes the
 // groups already exist and uses their email addresses for IAM bindings.
-func deployGroups(ctx *pulumi.Context, cfg *Config) error {
+func deployGroups(ctx *pulumi.Context, cfg *Config) ([]pulumi.Resource, error) {
+	var groupResources []pulumi.Resource
 	if !cfg.CreateRequiredGroups && !cfg.CreateOptionalGroups {
-		return nil // Groups are pre-existing; nothing to create.
+		return groupResources, nil // Groups are pre-existing; nothing to create.
 	}
 
 	// Look up the org's directory customer ID (needed to scope groups).
@@ -39,7 +40,7 @@ func deployGroups(ctx *pulumi.Context, cfg *Config) error {
 		Organization: &cfg.OrgID,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	customerID := pulumi.String(org.DirectoryCustomerId)
 
@@ -60,15 +61,17 @@ func deployGroups(ctx *pulumi.Context, cfg *Config) error {
 			if email == "" {
 				continue
 			}
-			if _, err := group.NewGroup(ctx, "required-"+key, &group.GroupArgs{
+			grp, err := group.NewGroup(ctx, "required-"+key, &group.GroupArgs{
 				ID:                 email,
 				DisplayName:        key,
 				Description:        key,
 				CustomerID:         customerID,
 				InitialGroupConfig: cfg.InitialGroupConfig,
-			}); err != nil {
-				return err
+			})
+			if err != nil {
+				return nil, err
 			}
+			groupResources = append(groupResources, grp)
 		}
 	}
 
@@ -89,19 +92,21 @@ func deployGroups(ctx *pulumi.Context, cfg *Config) error {
 
 		for key, email := range optionalGroups {
 			if email == "" {
-				continue // Skip unconfigured optional groups
+				continue
 			}
-			if _, err := group.NewGroup(ctx, "optional-"+key, &group.GroupArgs{
+			grp, err := group.NewGroup(ctx, "optional-"+key, &group.GroupArgs{
 				ID:                 email,
 				DisplayName:        key,
 				Description:        key,
 				CustomerID:         customerID,
 				InitialGroupConfig: cfg.InitialGroupConfig,
-			}); err != nil {
-				return err
+			})
+			if err != nil {
+				return nil, err
 			}
+			groupResources = append(groupResources, grp)
 		}
 	}
 
-	return nil
+	return groupResources, nil
 }

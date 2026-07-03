@@ -6,8 +6,8 @@ github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERo
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/ProtonMail/go-crypto v1.4.1 h1:9RfcZHqEQUvP8RzecWEUafnZVtEvrBVL9BiF67IQOfM=
 github.com/ProtonMail/go-crypto v1.4.1/go.mod h1:e1OaTyu5SYVrO9gKOEhTc+5UcXtTUa+P3uLudwcgPqo=
-github.com/VitruvianSoftware/pulumi-library/go v0.4.1-0.20260703174208-a71371f11968 h1:R6iDp53ksLIdaUE6/ZT3XZMcdzJ5R6fWicjp92SVkKU=
-github.com/VitruvianSoftware/pulumi-library/go v0.4.1-0.20260703174208-a71371f11968/go.mod h1:ky/UwWj4SMMTgFZtE1eEPu0ISOBCnE0E5GtEQ6lnzIM=
+github.com/VitruvianSoftware/pulumi-library/go v0.5.1 h1:gpMqW+TE/NKcV+tL75laQt+OqZlS5GAFOMrR2hzznmM=
+github.com/VitruvianSoftware/pulumi-library/go v0.5.1/go.mod h1:ky/UwWj4SMMTgFZtE1eEPu0ISOBCnE0E5GtEQ6lnzIM=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/logging v0.4.2 h1:W983BJbSg4hh8ti6LLvQvTk0+g10wKj5Z8T2RpBETQk=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/logging v0.4.2/go.mod h1:rsPbJwdWYNKzwKVc4oXoESEMzgyQq83LHHO+gopFw3o=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/policy v0.4.0 h1:jcC/1DimPY1Xv5JDr4ZOFrxs2LjVkREfBEBmPyvBLXI=

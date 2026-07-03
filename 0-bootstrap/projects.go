@@ -28,10 +28,10 @@ import (
 
 // SeedProject holds outputs from the seed project deployment.
 type SeedProject struct {
-	ProjectID              pulumi.StringOutput
-	StateBucketName        pulumi.StringOutput
+	ProjectID               pulumi.StringOutput
+	StateBucketName         pulumi.StringOutput
 	ProjectsStateBucketName pulumi.StringOutput // Separate bucket for 4-projects stage
-	KMSKeyID               pulumi.StringOutput
+	KMSKeyID                pulumi.StringOutput
 }
 
 // CICDProject holds outputs from the CI/CD project deployment.
@@ -53,14 +53,14 @@ type CICDProject struct {
 func deploySeedProject(ctx *pulumi.Context, cfg *Config, folderID pulumi.StringOutput, bucketIAMMembers []pulumi.StringInput) (*SeedProject, error) {
 	kmsPrevent := !cfg.BucketTFStateKMSForceDestroy
 	b, err := bootstrap.NewBootstrap(ctx, "seed-bootstrap", &bootstrap.BootstrapArgs{
-		OrgID:          cfg.OrgID,
-		FolderID:       folderID,
-		BillingAccount: cfg.BillingAccount,
-		ProjectPrefix:  cfg.ProjectPrefix,
-		DefaultRegion:  cfg.DefaultRegion,
+		OrgID:            cfg.OrgID,
+		FolderID:         folderID,
+		BillingAccount:   cfg.BillingAccount,
+		ProjectPrefix:    cfg.ProjectPrefix,
+		DefaultRegion:    cfg.DefaultRegion,
 		DefaultRegionKMS: cfg.DefaultRegionKMS,
 		DefaultRegionGCS: cfg.DefaultRegionGCS,
-		RandomSuffix:   cfg.RandomSuffix,
+		RandomSuffix:     cfg.RandomSuffix,
 		ProjectLabels: pulumi.StringMap{
 			"environment":       pulumi.String("bootstrap"),
 			"application_name":  pulumi.String("seed-bootstrap"),

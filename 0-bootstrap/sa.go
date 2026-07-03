@@ -32,7 +32,8 @@ import (
 // deployIAM creates the granular service accounts and assigns least-privilege
 // IAM roles at every scope (org, parent, seed project, CI/CD project, billing).
 // This directly mirrors the Terraform foundation's sa.tf.
-func deployIAM(ctx *pulumi.Context, cfg *Config, seed *SeedProject, cicd *CICDProject) (map[string]*serviceaccount.Account, error) {
+func deployIAM(ctx *pulumi.Context, cfg *Config, seed *SeedProject, cicd *CICDProject, groupResources []pulumi.Resource) (map[string]*serviceaccount.Account, error) {
+	groupOpts := pulumi.DependsOn(groupResources)
 	// ========================================================================
 	// 1. Create Granular Service Accounts
 	// Each foundation stage gets a dedicated SA for separation of duty.
@@ -285,7 +286,7 @@ func deployIAM(ctx *pulumi.Context, cfg *Config, seed *SeedProject, cicd *CICDPr
 			OrgID:  pulumi.String(cfg.OrgID),
 			Role:   pulumi.String(role),
 			Member: orgAdminGroupMember,
-		}); err != nil {
+		}, groupOpts); err != nil {
 			return nil, err
 		}
 	}
@@ -294,7 +295,7 @@ func deployIAM(ctx *pulumi.Context, cfg *Config, seed *SeedProject, cicd *CICDPr
 		OrgID:  pulumi.String(cfg.OrgID),
 		Role:   pulumi.String("roles/billing.admin"),
 		Member: pulumi.Sprintf("group:%s", cfg.GroupBillingAdmins),
-	}); err != nil {
+	}, groupOpts); err != nil {
 		return nil, err
 	}
 
@@ -324,7 +325,7 @@ func deployIAM(ctx *pulumi.Context, cfg *Config, seed *SeedProject, cicd *CICDPr
 			ServiceAccountID: sa.Name,
 			Role:             pulumi.String("roles/iam.serviceAccountTokenCreator"),
 			Member:           orgAdminGroupMember,
-		}); err != nil {
+		}, groupOpts); err != nil {
 			return nil, err
 		}
 		// roles/iam.serviceAccountUser allows the admins to "act as" the SA
@@ -333,7 +334,7 @@ func deployIAM(ctx *pulumi.Context, cfg *Config, seed *SeedProject, cicd *CICDPr
 			ServiceAccountID: sa.Name,
 			Role:             pulumi.String("roles/iam.serviceAccountUser"),
 			Member:           orgAdminGroupMember,
-		}); err != nil {
+		}, groupOpts); err != nil {
 			return nil, err
 		}
 	}
@@ -346,7 +347,7 @@ func deployIAM(ctx *pulumi.Context, cfg *Config, seed *SeedProject, cicd *CICDPr
 		ParentId:   pulumi.String(cfg.ParentID),
 		Member:     orgAdminGroupMember,
 		Roles:      []string{"roles/serviceusage.serviceUsageConsumer"},
-	})
+	}, groupOpts)
 	if err != nil {
 		return nil, err
 	}
