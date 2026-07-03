@@ -346,12 +346,12 @@ func loadOrgConfig(ctx *pulumi.Context) *OrgConfig {
 		// SCC
 		SCCNotificationName:   conf.Get("scc_notification_name"),
 		SCCNotificationFilter: conf.Get("scc_notification_filter"),
-		EnableSCCResources:       conf.Get("enable_scc_resources") != "false",
-		EnableBillingAccountSink: conf.Get("enable_billing_account_sink") != "false",
+		EnableSCCResources:       conf.Get("enable_scc_resources") != "false", // defaults to true
+		EnableBillingAccountSink: conf.Get("enable_billing_account_sink") == "true", // defaults to false
 
 		// Policies
 		CreateAccessContextManagerPolicy: conf.Get("create_access_context_manager_policy") != "false",
-		EnforceAllowedWorkerPools:        conf.Get("enforce_allowed_worker_pools") == "true",
+		EnforceAllowedWorkerPools:        conf.Get("enforce_allowed_worker_pools") != "false", // default to true
 		EnableHubAndSpoke:                conf.Get("enable_hub_and_spoke") == "true",
 		AllowedWorkerPoolID:              conf.Get("allowed_worker_pool_id"),
 
@@ -369,7 +369,7 @@ func loadOrgConfig(ctx *pulumi.Context) *OrgConfig {
 		// Logging storage options (H6, H7)
 		LogExportStorageLocation:     conf.Get("log_export_storage_location"),
 		LogExportStorageForceDestroy: conf.Get("log_export_storage_force_destroy") == "true",
-		LogExportStorageVersioning:   conf.Get("log_export_storage_versioning") != "false",
+		LogExportStorageVersioning:   conf.Get("log_export_storage_versioning") == "true", // defaults to false
 
 		// Logging billing export
 		BillingExportDatasetLocation: conf.Get("billing_export_dataset_location"),
