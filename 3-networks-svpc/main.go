@@ -80,17 +80,19 @@ func main() {
 		// 2. VPC & Subnets (delete_default_routes_on_create = true)
 		netName := fmt.Sprintf("vpc-%s-svpc", cfg.EnvCode)
 		netOpts := &networking.NetworkingArgs{
-			ProjectID: pulumi.String(cfg.ProjectID),
-			VPCName:   pulumi.String(netName),
-			EnablePSA: true,
+			ProjectID:          pulumi.String(cfg.ProjectID),
+			VPCName:            pulumi.String(netName),
+			EnablePSA:          true,
+			PrivateServiceCidr: cfg.PrivateServiceCidr,
 			Subnets: []networking.SubnetArgs{
 				{
 					Name:   fmt.Sprintf("sb-%s-svpc-%s", cfg.EnvCode, cfg.Region1),
 					Region: cfg.Region1,
-					CIDR:   "10.8.64.0/18",
+					CIDR:   cfg.Primary1,
+					// Upstream attaches secondary ranges to region1 only.
 					SecondaryRanges: []networking.SecondaryRangeArgs{
-						{RangeName: fmt.Sprintf("rn-%s-svpc-%s-gke-pod", cfg.EnvCode, cfg.Region1), CIDR: "100.72.64.0/18"},
-						{RangeName: fmt.Sprintf("rn-%s-svpc-%s-gke-svc", cfg.EnvCode, cfg.Region1), CIDR: "100.73.64.0/18"},
+						{RangeName: fmt.Sprintf("rn-%s-svpc-%s-gke-pod", cfg.EnvCode, cfg.Region1), CIDR: cfg.SecPod1},
+						{RangeName: fmt.Sprintf("rn-%s-svpc-%s-gke-svc", cfg.EnvCode, cfg.Region1), CIDR: cfg.SecSvc1},
 					},
 					FlowLogs:         true,
 					FlowLogsInterval: cfg.VpcFlowLogs.AggregationInterval,
@@ -100,11 +102,8 @@ func main() {
 				{
 					Name:   fmt.Sprintf("sb-%s-svpc-%s", cfg.EnvCode, cfg.Region2),
 					Region: cfg.Region2,
-					CIDR:   "10.9.64.0/18",
-					SecondaryRanges: []networking.SecondaryRangeArgs{
-						{RangeName: fmt.Sprintf("rn-%s-svpc-%s-gke-pod", cfg.EnvCode, cfg.Region2), CIDR: "100.74.64.0/18"},
-						{RangeName: fmt.Sprintf("rn-%s-svpc-%s-gke-svc", cfg.EnvCode, cfg.Region2), CIDR: "100.75.64.0/18"},
-					},
+					CIDR:   cfg.Primary2,
+					// region2 has no secondary ranges (upstream subnet_secondary_ranges is region1-only).
 					FlowLogs:         true,
 					FlowLogsInterval: cfg.VpcFlowLogs.AggregationInterval,
 					FlowLogsSampling: cfg.VpcFlowLogs.FlowSampling,
@@ -113,14 +112,14 @@ func main() {
 				{ // Proxy-only subnets for ILB
 					Name:    fmt.Sprintf("sb-%s-svpc-%s-proxy", cfg.EnvCode, cfg.Region1),
 					Region:  cfg.Region1,
-					CIDR:    "10.26.2.0/23",
+					CIDR:    cfg.Proxy1,
 					Role:    "ACTIVE",
 					Purpose: "REGIONAL_MANAGED_PROXY",
 				},
 				{
 					Name:    fmt.Sprintf("sb-%s-svpc-%s-proxy", cfg.EnvCode, cfg.Region2),
 					Region:  cfg.Region2,
-					CIDR:    "10.27.2.0/23",
+					CIDR:    cfg.Proxy2,
 					Role:    "ACTIVE",
 					Purpose: "REGIONAL_MANAGED_PROXY",
 				},
@@ -139,7 +138,7 @@ func main() {
 			TargetVPCs: []pulumi.StringInput{
 				pulumi.Sprintf("projects/%s/global/networks/%s", cfg.ProjectID, vpcModule.VPC.Name),
 			},
-			Rules: networking.BuildFoundationRules(cfg.EnvCode, cfg.FirewallPoliciesEnableLogging, cfg.PscIP+"/32", []string{"10.8.64.0/18", "10.9.64.0/18"}, false),
+			Rules: networking.BuildFoundationRules(cfg.EnvCode, cfg.FirewallPoliciesEnableLogging, cfg.PscIP+"/32", []string{cfg.Primary1, cfg.Primary2}, false),
 		}, pulumi.DependsOn([]pulumi.Resource{vpcModule.VPC}))
 		if err != nil {
 			return err
@@ -173,18 +172,35 @@ func main() {
 			return err
 		}
 
-		// 6. Egress internet route (tag-based, only when NAT is enabled)
-		_, err = compute.NewRoute(ctx, "egress-internet", &compute.RouteArgs{
-			Project:        pulumi.String(cfg.ProjectID),
-			Name:           pulumi.String(fmt.Sprintf("rt-%s-svpc-1000-egress-internet-default", cfg.EnvCode)),
-			Network:        vpcModule.VPC.ID(),
-			DestRange:      pulumi.String("0.0.0.0/0"),
-			NextHopGateway: pulumi.String("default-internet-gateway"),
-			Priority:       pulumi.Int(1000),
-			Tags:           pulumi.StringArray{pulumi.String("egress-internet")},
-		}, pulumi.DependsOn([]pulumi.Resource{vpcModule.VPC}))
-		if err != nil {
-			return err
+		// 6. Egress internet route (tag-based, only when NAT is enabled — matches upstream nat_enabled gating)
+		if cfg.NatEnabled {
+			_, err = compute.NewRoute(ctx, "egress-internet", &compute.RouteArgs{
+				Project:        pulumi.String(cfg.ProjectID),
+				Name:           pulumi.String(fmt.Sprintf("rt-%s-svpc-1000-egress-internet-default", cfg.EnvCode)),
+				Network:        vpcModule.VPC.ID(),
+				DestRange:      pulumi.String("0.0.0.0/0"),
+				NextHopGateway: pulumi.String("default-internet-gateway"),
+				Priority:       pulumi.Int(1000),
+				Tags:           pulumi.StringArray{pulumi.String("egress-internet")},
+			}, pulumi.DependsOn([]pulumi.Resource{vpcModule.VPC}))
+			if err != nil {
+				return err
+			}
+		}
+
+		// 6b. Windows KMS activation route (optional — matches upstream windows_activation_enabled)
+		if cfg.WindowsActivationEnabled {
+			_, err = compute.NewRoute(ctx, "windows-kms", &compute.RouteArgs{
+				Project:        pulumi.String(cfg.ProjectID),
+				Name:           pulumi.String(fmt.Sprintf("rt-%s-svpc-1000-all-default-windows-kms", cfg.EnvCode)),
+				Network:        vpcModule.VPC.ID(),
+				DestRange:      pulumi.String("35.190.247.13/32"),
+				NextHopGateway: pulumi.String("default-internet-gateway"),
+				Priority:       pulumi.Int(1000),
+			}, pulumi.DependsOn([]pulumi.Resource{vpcModule.VPC}))
+			if err != nil {
+				return err
+			}
 		}
 
 		// 7. DNS Peering / Forwarding Zones
@@ -214,9 +230,11 @@ func main() {
 			}
 		}
 
-		// 8. BGP Cloud Routers — 4 total (2 per region), matching upstream
-		for _, reg := range []string{cfg.Region1, cfg.Region2} {
-			for _, crIdx := range []string{"5", "6"} {
+		// 8. BGP Cloud Routers — 4 total (2 per region), matching upstream:
+		// region1 routers are cr5/cr6, region2 routers are cr7/cr8.
+		routerIndexes := [][]string{{"5", "6"}, {"7", "8"}}
+		for i, reg := range []string{cfg.Region1, cfg.Region2} {
+			for _, crIdx := range routerIndexes[i] {
 				_, err = networking.NewCloudRouter(ctx, fmt.Sprintf("cr-%s-cr%s", reg, crIdx), &networking.RouterArgs{
 					ProjectID:          pulumi.String(cfg.ProjectID),
 					Region:             reg,
@@ -232,18 +250,21 @@ func main() {
 			}
 		}
 
-		// 9. Separate NAT Routers — 1 per region with static IPs (matches upstream nat.tf)
-		for _, reg := range []string{cfg.Region1, cfg.Region2} {
-			_, err = networking.NewCloudRouter(ctx, fmt.Sprintf("nat-router-%s", reg), &networking.RouterArgs{
-				ProjectID:       pulumi.String(cfg.ProjectID),
-				Region:          reg,
-				Network:         vpcModule.VPC.SelfLink,
-				BgpAsn:          cfg.NatBgpAsn,
-				EnableNat:       true,
-				NatNumAddresses: cfg.NatNumAddresses,
-			}, pulumi.DependsOn([]pulumi.Resource{vpcModule.VPC}))
-			if err != nil {
-				return err
+		// 9. Separate NAT Routers — 1 per region with static IPs (matches upstream nat.tf).
+		// Gated on nat_enabled to mirror upstream.
+		if cfg.NatEnabled {
+			for _, reg := range []string{cfg.Region1, cfg.Region2} {
+				_, err = networking.NewCloudRouter(ctx, fmt.Sprintf("nat-router-%s", reg), &networking.RouterArgs{
+					ProjectID:       pulumi.String(cfg.ProjectID),
+					Region:          reg,
+					Network:         vpcModule.VPC.SelfLink,
+					BgpAsn:          cfg.NatBgpAsn,
+					EnableNat:       true,
+					NatNumAddresses: cfg.NatNumAddresses,
+				}, pulumi.DependsOn([]pulumi.Resource{vpcModule.VPC}))
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -259,6 +280,91 @@ func main() {
 			acmPolicyID = orgStack.GetStringOutput(pulumi.String("access_context_manager_policy_id"))
 		} else {
 			acmPolicyID = pulumi.String("").ToStringOutput()
+		}
+
+		// Read deploy-pipeline SA emails from the bootstrap stack (mirrors TF
+		// modules/base_env/remote.tf) and prepend them to the VPC-SC perimeter
+		// members (enforced + dry-run) so a strictly enforced perimeter does not
+		// lock out the org/networks/projects step deploy SAs. The networks SA is
+		// also used to scope the dedicated-interconnect egress policy identity.
+		// Degrades gracefully when the bootstrap stack/outputs are unavailable
+		// (e.g. unit tests with mocks, or a not-yet-deployed bootstrap stack).
+		var networksSA string
+		if cfg.BootstrapStackName != "" {
+			if bootstrapStack, refErr := pulumi.NewStackReference(ctx, "bootstrap", &pulumi.StackReferenceArgs{
+				Name: pulumi.String(cfg.BootstrapStackName),
+			}); refErr == nil {
+				var saMembers []string
+				for _, outName := range []string{
+					"organization_step_terraform_service_account_email",
+					"networks_step_terraform_service_account_email",
+					"projects_step_terraform_service_account_email",
+				} {
+					details, detErr := bootstrapStack.GetOutputDetails(outName)
+					if detErr != nil || details.Value == nil {
+						continue
+					}
+					email, ok := details.Value.(string)
+					if !ok || email == "" {
+						continue
+					}
+					saMembers = append(saMembers, "serviceAccount:"+email)
+					if outName == "networks_step_terraform_service_account_email" {
+						networksSA = email
+					}
+				}
+				// Prepend the deploy SAs ahead of any operator-supplied members.
+				if len(saMembers) > 0 {
+					cfg.VpcScMembers = append(saMembers, cfg.VpcScMembers...)
+				}
+			}
+		}
+
+		// Dedicated-interconnect egress policy — scope the identity to the networks
+		// deploy SA when known (mirrors TF local.dedicated_interconnect_egress_policy),
+		// otherwise fall back to ANY_IDENTITY.
+		if cfg.EnableDedicatedInterconnect {
+			var statusFrom accesscontextmanager.ServicePerimeterStatusEgressPolicyEgressFromArgs
+			var specFrom accesscontextmanager.ServicePerimeterSpecEgressPolicyEgressFromArgs
+			if networksSA != "" {
+				statusFrom.Identities = pulumi.StringArray{pulumi.String("serviceAccount:" + networksSA)}
+				specFrom.Identities = pulumi.StringArray{pulumi.String("serviceAccount:" + networksSA)}
+			} else {
+				statusFrom.IdentityType = pulumi.String("ANY_IDENTITY")
+				specFrom.IdentityType = pulumi.String("ANY_IDENTITY")
+			}
+			cfg.VpcScEgressPolicies = append(cfg.VpcScEgressPolicies, accesscontextmanager.ServicePerimeterStatusEgressPolicyArgs{
+				EgressFrom: statusFrom,
+				EgressTo: accesscontextmanager.ServicePerimeterStatusEgressPolicyEgressToArgs{
+					Resources: pulumi.StringArray{pulumi.String("*")},
+					Operations: accesscontextmanager.ServicePerimeterStatusEgressPolicyEgressToOperationArray{
+						&accesscontextmanager.ServicePerimeterStatusEgressPolicyEgressToOperationArgs{
+							ServiceName: pulumi.String("compute.googleapis.com"),
+							MethodSelectors: accesscontextmanager.ServicePerimeterStatusEgressPolicyEgressToOperationMethodSelectorArray{
+								&accesscontextmanager.ServicePerimeterStatusEgressPolicyEgressToOperationMethodSelectorArgs{
+									Method: pulumi.String("*"),
+								},
+							},
+						},
+					},
+				},
+			})
+			cfg.VpcScEgressPoliciesDryRun = append(cfg.VpcScEgressPoliciesDryRun, accesscontextmanager.ServicePerimeterSpecEgressPolicyArgs{
+				EgressFrom: specFrom,
+				EgressTo: accesscontextmanager.ServicePerimeterSpecEgressPolicyEgressToArgs{
+					Resources: pulumi.StringArray{pulumi.String("*")},
+					Operations: accesscontextmanager.ServicePerimeterSpecEgressPolicyEgressToOperationArray{
+						&accesscontextmanager.ServicePerimeterSpecEgressPolicyEgressToOperationArgs{
+							ServiceName: pulumi.String("compute.googleapis.com"),
+							MethodSelectors: accesscontextmanager.ServicePerimeterSpecEgressPolicyEgressToOperationMethodSelectorArray{
+								&accesscontextmanager.ServicePerimeterSpecEgressPolicyEgressToOperationMethodSelectorArgs{
+									Method: pulumi.String("*"),
+								},
+							},
+						},
+					},
+				},
+			})
 		}
 
 		// 10. VPC Service Controls Perimeter
@@ -346,17 +452,28 @@ type VpcFlowLogsConfig struct {
 }
 
 type NetConfig struct {
-	Env                           string
-	EnvCode                       string // single-char env code (d, n, p)
-	ProjectID                     string
-	Region1                       string
-	Region2                       string
-	ParentID                      string
-	PolicyID                      string
-	OrgStackName                  string
-	DNSProjectID                  string
-	Domain                        string
-	PscIP                         string
+	Env                string
+	EnvCode            string // single-char env code (d, n, p)
+	ProjectID          string
+	Region1            string
+	Region2            string
+	ParentID           string
+	PolicyID           string
+	OrgStackName       string
+	DNSProjectID       string
+	Domain             string
+	PscIP              string
+	BootstrapStackName string
+	// Per-environment CIDR ranges (populated by loadNetConfig via a switch on EnvCode).
+	Primary1                      string
+	Primary2                      string
+	Proxy1                        string
+	Proxy2                        string
+	SecPod1                       string
+	SecSvc1                       string
+	PrivateServiceCidr            string
+	NatEnabled                    bool
+	WindowsActivationEnabled      bool
 	BgpAsn                        int
 	NatBgpAsn                     int
 	NatNumAddresses               int
@@ -380,17 +497,18 @@ func loadNetConfig(ctx *pulumi.Context) *NetConfig {
 	conf := config.New(ctx, "")
 
 	c := &NetConfig{
-		Env:          conf.Require("env"),
-		EnvCode:      conf.Require("env_code"),
-		ProjectID:    conf.Require("project_id"),
-		Region1:      conf.Get("region1"),
-		Region2:      conf.Get("region2"),
-		ParentID:     conf.Require("parent_id"),
-		PolicyID:     conf.Get("policy_id"),
-		OrgStackName: conf.Get("org_stack_name"),
-		DNSProjectID: conf.Get("dns_project_id"),
-		Domain:       conf.Get("domain"),
-		PscIP:        conf.Get("psc_ip"),
+		Env:                conf.Require("env"),
+		EnvCode:            conf.Require("env_code"),
+		ProjectID:          conf.Require("project_id"),
+		Region1:            conf.Get("region1"),
+		Region2:            conf.Get("region2"),
+		ParentID:           conf.Require("parent_id"),
+		PolicyID:           conf.Get("policy_id"),
+		OrgStackName:       conf.Get("org_stack_name"),
+		DNSProjectID:       conf.Get("dns_project_id"),
+		Domain:             conf.Get("domain"),
+		PscIP:              conf.Get("psc_ip"),
+		BootstrapStackName: conf.Get("bootstrap_stack_name"),
 	}
 	conf.GetObject("vpc_sc_members", &c.VpcScMembers)
 	conf.GetObject("vpc_sc_projects", &c.VpcScProjects)
@@ -438,6 +556,20 @@ func loadNetConfig(ctx *pulumi.Context) *NetConfig {
 		c.EnableDedicatedInterconnect = false
 	}
 
+	// nat_enabled defaults to true to preserve the current always-on NAT behavior.
+	// NOTE: this diverges from the upstream Terraform default (nat_enabled = false).
+	if val, err := conf.TryBool("nat_enabled"); err == nil {
+		c.NatEnabled = val
+	} else {
+		c.NatEnabled = true
+	}
+
+	if val, err := conf.TryBool("windows_activation_enabled"); err == nil {
+		c.WindowsActivationEnabled = val
+	} else {
+		c.WindowsActivationEnabled = false // matches upstream default
+	}
+
 	if c.Region1 == "" {
 		c.Region1 = "us-central1"
 	}
@@ -450,51 +582,56 @@ func loadNetConfig(ctx *pulumi.Context) *NetConfig {
 	if c.OrgStackName == "" {
 		c.OrgStackName = "org"
 	}
+	if c.BootstrapStackName == "" {
+		c.BootstrapStackName = "bootstrap"
+	}
+
+	// Per-environment CIDR ranges (mirrors upstream envs/<env>/main.tf locals).
+	switch c.EnvCode {
+	case "n": // nonproduction
+		c.Primary1 = "10.8.128.0/18"
+		c.Primary2 = "10.9.128.0/18"
+		c.Proxy1 = "10.26.4.0/23"
+		c.Proxy2 = "10.27.4.0/23"
+		c.SecPod1 = "100.72.128.0/18"
+		c.SecSvc1 = "100.73.128.0/18"
+		c.PrivateServiceCidr = "10.16.48.0/21"
+	case "p": // production
+		c.Primary1 = "10.8.192.0/18"
+		c.Primary2 = "10.9.192.0/18"
+		c.Proxy1 = "10.26.6.0/23"
+		c.Proxy2 = "10.27.6.0/23"
+		c.SecPod1 = "100.72.192.0/18"
+		c.SecSvc1 = "100.73.192.0/18"
+		c.PrivateServiceCidr = "10.16.56.0/21"
+	default: // development ("d")
+		c.Primary1 = "10.8.64.0/18"
+		c.Primary2 = "10.9.64.0/18"
+		c.Proxy1 = "10.26.2.0/23"
+		c.Proxy2 = "10.27.2.0/23"
+		c.SecPod1 = "100.72.64.0/18"
+		c.SecSvc1 = "100.73.64.0/18"
+		c.PrivateServiceCidr = "10.16.40.0/21"
+	}
+
+	// private_service_connect_ip defaults per env (respecting an explicit psc_ip config).
 	if c.PscIP == "" {
-		c.PscIP = "10.17.0.6"
+		switch c.EnvCode {
+		case "n":
+			c.PscIP = "10.17.0.7"
+		case "p":
+			c.PscIP = "10.17.0.8"
+		default:
+			c.PscIP = "10.17.0.6"
+		}
 	}
 	if len(c.VpcScRestrictedServices) == 0 {
 		c.VpcScRestrictedServices = vpc_sc.GetDefaultRestrictedServices()
 	}
 
-	if c.EnableDedicatedInterconnect {
-		c.VpcScEgressPolicies = append(c.VpcScEgressPolicies, accesscontextmanager.ServicePerimeterStatusEgressPolicyArgs{
-			EgressFrom: accesscontextmanager.ServicePerimeterStatusEgressPolicyEgressFromArgs{
-				IdentityType: pulumi.String("ANY_IDENTITY"),
-			},
-			EgressTo: accesscontextmanager.ServicePerimeterStatusEgressPolicyEgressToArgs{
-				Resources: pulumi.StringArray{pulumi.String("*")},
-				Operations: accesscontextmanager.ServicePerimeterStatusEgressPolicyEgressToOperationArray{
-					&accesscontextmanager.ServicePerimeterStatusEgressPolicyEgressToOperationArgs{
-						ServiceName: pulumi.String("compute.googleapis.com"),
-						MethodSelectors: accesscontextmanager.ServicePerimeterStatusEgressPolicyEgressToOperationMethodSelectorArray{
-							&accesscontextmanager.ServicePerimeterStatusEgressPolicyEgressToOperationMethodSelectorArgs{
-								Method: pulumi.String("*"),
-							},
-						},
-					},
-				},
-			},
-		})
-		c.VpcScEgressPoliciesDryRun = append(c.VpcScEgressPoliciesDryRun, accesscontextmanager.ServicePerimeterSpecEgressPolicyArgs{
-			EgressFrom: accesscontextmanager.ServicePerimeterSpecEgressPolicyEgressFromArgs{
-				IdentityType: pulumi.String("ANY_IDENTITY"),
-			},
-			EgressTo: accesscontextmanager.ServicePerimeterSpecEgressPolicyEgressToArgs{
-				Resources: pulumi.StringArray{pulumi.String("*")},
-				Operations: accesscontextmanager.ServicePerimeterSpecEgressPolicyEgressToOperationArray{
-					&accesscontextmanager.ServicePerimeterSpecEgressPolicyEgressToOperationArgs{
-						ServiceName: pulumi.String("compute.googleapis.com"),
-						MethodSelectors: accesscontextmanager.ServicePerimeterSpecEgressPolicyEgressToOperationMethodSelectorArray{
-							&accesscontextmanager.ServicePerimeterSpecEgressPolicyEgressToOperationMethodSelectorArgs{
-								Method: pulumi.String("*"),
-							},
-						},
-					},
-				},
-			},
-		})
-	}
+	// NOTE: the dedicated-interconnect egress policy is built in main() (not here),
+	// because its egress identity is scoped to the networks-step deploy SA email
+	// resolved from the bootstrap StackReference (item 8/9). See main().
 	if len(c.FirewallAssociations) == 0 {
 		c.FirewallAssociations = []string{c.ParentID} // Fallback to parent
 	}
