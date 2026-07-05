@@ -34,6 +34,10 @@ func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := loadNetConfig(ctx)
 
+		// Prepend the bootstrap deploy service accounts to the VPC-SC perimeter
+		// members (read live from the bootstrap stack, mirroring upstream).
+		cfg.DeploySAMembers = readBootstrapDeploySAs(ctx, cfg.BootstrapStackName)
+
 		// Compute environment-specific advertised IP ranges
 		advertisedRanges := []networking.AdvertisedIPRange{
 			{Range: cfg.PscIP + "/32", Description: "PSC Endpoint"},
@@ -76,30 +80,39 @@ func main() {
 				EnablePSA: true,
 				Subnets: []networking.SubnetArgs{
 					{
-						Name:   fmt.Sprintf("sb-%s-svpc-hub-%s", cfg.EnvCode, cfg.Region1),
-						Region: cfg.Region1,
-						CIDR:   cfg.HubSubnet1Cidr,
-						SecondaryRanges: []networking.SecondaryRangeArgs{
-							{RangeName: fmt.Sprintf("rn-%s-hub-%s-gke-pod", cfg.EnvCode, cfg.Region1), CIDR: "100.64.64.0/18"},
-							{RangeName: fmt.Sprintf("rn-%s-hub-%s-gke-svc", cfg.EnvCode, cfg.Region1), CIDR: "100.65.64.0/18"},
-						},
+						// Upstream hub secondary_ranges = {} (no gke-pod/gke-svc on the hub).
+						Name:             fmt.Sprintf("sb-%s-svpc-hub-%s", cfg.EnvCode, cfg.Region1),
+						Region:           cfg.Region1,
+						CIDR:             cfg.HubSubnet1Cidr,
 						FlowLogs:         true,
 						FlowLogsInterval: cfg.VpcFlowLogs.AggregationInterval,
 						FlowLogsSampling: cfg.VpcFlowLogs.FlowSampling,
 						FlowLogsMetadata: cfg.VpcFlowLogs.Metadata,
 					},
 					{
-						Name:   fmt.Sprintf("sb-%s-svpc-hub-%s", cfg.EnvCode, cfg.Region2),
-						Region: cfg.Region2,
-						CIDR:   cfg.HubSubnet2Cidr,
-						SecondaryRanges: []networking.SecondaryRangeArgs{
-							{RangeName: fmt.Sprintf("rn-%s-hub-%s-gke-pod", cfg.EnvCode, cfg.Region2), CIDR: "100.66.64.0/18"},
-							{RangeName: fmt.Sprintf("rn-%s-hub-%s-gke-svc", cfg.EnvCode, cfg.Region2), CIDR: "100.67.64.0/18"},
-						},
+						Name:             fmt.Sprintf("sb-%s-svpc-hub-%s", cfg.EnvCode, cfg.Region2),
+						Region:           cfg.Region2,
+						CIDR:             cfg.HubSubnet2Cidr,
 						FlowLogs:         true,
 						FlowLogsInterval: cfg.VpcFlowLogs.AggregationInterval,
 						FlowLogsSampling: cfg.VpcFlowLogs.FlowSampling,
 						FlowLogsMetadata: cfg.VpcFlowLogs.Metadata,
+					},
+					{
+						// Hub regional managed-proxy subnets (upstream net-hubs.tf) so the
+						// hub VPC can host L7 internal load balancers.
+						Name:    fmt.Sprintf("sb-%s-svpc-hub-%s-proxy", cfg.EnvCode, cfg.Region1),
+						Region:  cfg.Region1,
+						CIDR:    cfg.HubProxy1Cidr,
+						Role:    "ACTIVE",
+						Purpose: "REGIONAL_MANAGED_PROXY",
+					},
+					{
+						Name:    fmt.Sprintf("sb-%s-svpc-hub-%s-proxy", cfg.EnvCode, cfg.Region2),
+						Region:  cfg.Region2,
+						CIDR:    cfg.HubProxy2Cidr,
+						Role:    "ACTIVE",
+						Purpose: "REGIONAL_MANAGED_PROXY",
 					},
 				},
 			}
@@ -110,17 +123,34 @@ func main() {
 			}
 
 			// Hub Egress internet route (tag-based, only when NAT is enabled)
-			_, err = compute.NewRoute(ctx, "hub-egress-internet", &compute.RouteArgs{
-				Project:        pulumi.String(cfg.HubProjectID),
-				Name:           pulumi.String(fmt.Sprintf("rt-%s-hub-1000-egress-internet-default", cfg.EnvCode)),
-				Network:        hubVpc.VPC.ID(),
-				DestRange:      pulumi.String("0.0.0.0/0"),
-				NextHopGateway: pulumi.String("default-internet-gateway"),
-				Priority:       pulumi.Int(1000),
-				Tags:           pulumi.StringArray{pulumi.String("egress-internet")},
-			}, pulumi.DependsOn([]pulumi.Resource{hubVpc.VPC}))
-			if err != nil {
-				return err
+			if cfg.NatEnabled {
+				_, err = compute.NewRoute(ctx, "hub-egress-internet", &compute.RouteArgs{
+					Project:        pulumi.String(cfg.HubProjectID),
+					Name:           pulumi.String(fmt.Sprintf("rt-%s-hub-1000-egress-internet-default", cfg.EnvCode)),
+					Network:        hubVpc.VPC.ID(),
+					DestRange:      pulumi.String("0.0.0.0/0"),
+					NextHopGateway: pulumi.String("default-internet-gateway"),
+					Priority:       pulumi.Int(1000),
+					Tags:           pulumi.StringArray{pulumi.String("egress-internet")},
+				}, pulumi.DependsOn([]pulumi.Resource{hubVpc.VPC}))
+				if err != nil {
+					return err
+				}
+			}
+
+			// Windows KMS activation route (upstream windows_activation_enabled).
+			if cfg.WindowsActivationEnabled {
+				_, err = compute.NewRoute(ctx, "hub-windows-kms", &compute.RouteArgs{
+					Project:        pulumi.String(cfg.HubProjectID),
+					Name:           pulumi.String(fmt.Sprintf("rt-%s-svpc-hub-1000-all-default-windows-kms", cfg.EnvCode)),
+					Network:        hubVpc.VPC.ID(),
+					DestRange:      pulumi.String("35.190.247.13/32"),
+					NextHopGateway: pulumi.String("default-internet-gateway"),
+					Priority:       pulumi.Int(1000),
+				}, pulumi.DependsOn([]pulumi.Resource{hubVpc.VPC}))
+				if err != nil {
+					return err
+				}
 			}
 
 			// 4. Hub VPC-Level Firewall — data-driven rules
@@ -177,55 +207,67 @@ func main() {
 				return err
 			}
 
-			// 8. Transitivity Appliance — MIG+ILB per region
-			_, err = networking.NewTransitivityAppliance(ctx, "transitivity", &networking.TransitivityApplianceArgs{
-				ProjectID:   pulumi.String(cfg.HubProjectID),
-				Regions:     []string{cfg.Region1, cfg.Region2},
-				Network:     hubVpc.VPC.SelfLink,
-				NetworkName: hubVpcName,
-				Subnetworks: map[string]pulumi.StringInput{
-					cfg.Region1: hubVpc.Subnets[fmt.Sprintf("sb-%s-svpc-hub-%s", cfg.EnvCode, cfg.Region1)].SelfLink,
-					cfg.Region2: hubVpc.Subnets[fmt.Sprintf("sb-%s-svpc-hub-%s", cfg.EnvCode, cfg.Region2)].SelfLink,
-				},
-				RegionalAggregates: map[string][]string{
-					cfg.Region1: {"10.0.0.0/16", "10.8.0.0/16", "100.64.0.0/18"},
-					cfg.Region2: {"10.1.0.0/16", "10.9.0.0/16", "100.66.0.0/18"},
-				},
-				FirewallPolicy: hubFw.Policy.Name,
-			}, pulumi.DependsOn([]pulumi.Resource{hubVpc.VPC}))
-			if err != nil {
-				return err
-			}
-
-			// 8.1. Hub Firewall — Allow Health Checks to Transitivity ILBs
-			_, err = compute.NewFirewall(ctx, "fw-hub-allow-health-checks", &compute.FirewallArgs{
-				Project: pulumi.String(cfg.HubProjectID),
-				Name:    pulumi.String(fmt.Sprintf("fw-%s-hub-allow-health-checks", cfg.EnvCode)),
-				Network: hubVpc.VPC.SelfLink,
-				Allows: compute.FirewallAllowArray{
-					&compute.FirewallAllowArgs{
-						Protocol: pulumi.String("tcp"),
-						Ports:    pulumi.StringArray{pulumi.String("22")},
+			// 8. Transitivity Appliance — MIG+ILB per region.
+			// Gated on enable_hub_and_spoke_transitivity (default true preserves the
+			// prior always-on behavior; set false to disable).
+			if cfg.EnableTransitivity {
+				_, err = networking.NewTransitivityAppliance(ctx, "transitivity", &networking.TransitivityApplianceArgs{
+					ProjectID:   pulumi.String(cfg.HubProjectID),
+					Regions:     []string{cfg.Region1, cfg.Region2},
+					Network:     hubVpc.VPC.SelfLink,
+					NetworkName: hubVpcName,
+					Subnetworks: map[string]pulumi.StringInput{
+						cfg.Region1: hubVpc.Subnets[fmt.Sprintf("sb-%s-svpc-hub-%s", cfg.EnvCode, cfg.Region1)].SelfLink,
+						cfg.Region2: hubVpc.Subnets[fmt.Sprintf("sb-%s-svpc-hub-%s", cfg.EnvCode, cfg.Region2)].SelfLink,
 					},
-				},
-				SourceRanges: pulumi.StringArray{
-					pulumi.String("130.211.0.0/22"),
-					pulumi.String("35.191.0.0/16"),
-				},
-				TargetTags: pulumi.StringArray{
-					pulumi.String("allow-transitivity"),
-				},
-			}, pulumi.DependsOn([]pulumi.Resource{hubVpc.VPC}))
-			if err != nil {
-				return err
-			}
+					// Upstream regional_aggregates (net-hubs-transitivity.tf).
+					RegionalAggregates: map[string][]string{
+						cfg.Region1: {"10.8.0.0/16", "100.72.0.0/16"},
+						cfg.Region2: {"10.9.0.0/16", "100.73.0.0/16"},
+					},
+					FirewallPolicy: hubFw.Policy.Name,
+				}, pulumi.DependsOn([]pulumi.Resource{hubVpc.VPC}))
+				if err != nil {
+					return err
+				}
 
-			// 9. Hub BGP Routers — 4 total (2 per region), hub only (not on spokes)
-			for _, reg := range []string{cfg.Region1, cfg.Region2} {
-				for _, crIdx := range []string{"5", "6"} {
-					_, err = networking.NewCloudRouter(ctx, fmt.Sprintf("hub-cr-%s-cr%s", reg, crIdx), &networking.RouterArgs{
+				// 8.1. Hub Firewall — Allow Health Checks to Transitivity ILBs
+				_, err = compute.NewFirewall(ctx, "fw-hub-allow-health-checks", &compute.FirewallArgs{
+					Project: pulumi.String(cfg.HubProjectID),
+					Name:    pulumi.String(fmt.Sprintf("fw-%s-hub-allow-health-checks", cfg.EnvCode)),
+					Network: hubVpc.VPC.SelfLink,
+					Allows: compute.FirewallAllowArray{
+						&compute.FirewallAllowArgs{
+							Protocol: pulumi.String("tcp"),
+							Ports:    pulumi.StringArray{pulumi.String("22")},
+						},
+					},
+					SourceRanges: pulumi.StringArray{
+						pulumi.String("130.211.0.0/22"),
+						pulumi.String("35.191.0.0/16"),
+					},
+					TargetTags: pulumi.StringArray{
+						pulumi.String("allow-transitivity"),
+					},
+				}, pulumi.DependsOn([]pulumi.Resource{hubVpc.VPC}))
+				if err != nil {
+					return err
+				}
+			} // end enable_hub_and_spoke_transitivity
+
+			// 9. Hub BGP Routers — 4 total (2 per region), hub only (not on spokes).
+			// Upstream names region1 routers cr5/cr6 and region2 routers cr7/cr8.
+			for _, rc := range []struct {
+				region string
+				crIdxs []string
+			}{
+				{cfg.Region1, []string{"5", "6"}},
+				{cfg.Region2, []string{"7", "8"}},
+			} {
+				for _, crIdx := range rc.crIdxs {
+					_, err = networking.NewCloudRouter(ctx, fmt.Sprintf("hub-cr-%s-cr%s", rc.region, crIdx), &networking.RouterArgs{
 						ProjectID:          pulumi.String(cfg.HubProjectID),
-						Region:             reg,
+						Region:             rc.region,
 						Network:            hubVpc.VPC.SelfLink,
 						BgpAsn:             cfg.BgpAsn,
 						AdvertisedGroups:   []string{"ALL_SUBNETS"},
@@ -238,18 +280,20 @@ func main() {
 				}
 			}
 
-			// 10. Separate NAT routers on hub
-			for _, reg := range []string{cfg.Region1, cfg.Region2} {
-				_, err = networking.NewCloudRouter(ctx, fmt.Sprintf("hub-nat-%s", reg), &networking.RouterArgs{
-					ProjectID:       pulumi.String(cfg.HubProjectID),
-					Region:          reg,
-					Network:         hubVpc.VPC.SelfLink,
-					BgpAsn:          cfg.NatBgpAsn,
-					EnableNat:       true,
-					NatNumAddresses: cfg.NatNumAddresses,
-				}, pulumi.DependsOn([]pulumi.Resource{hubVpc.VPC}))
-				if err != nil {
-					return err
+			// 10. Separate NAT routers on hub (gated on nat_enabled).
+			if cfg.NatEnabled {
+				for _, reg := range []string{cfg.Region1, cfg.Region2} {
+					_, err = networking.NewCloudRouter(ctx, fmt.Sprintf("hub-nat-%s", reg), &networking.RouterArgs{
+						ProjectID:       pulumi.String(cfg.HubProjectID),
+						Region:          reg,
+						Network:         hubVpc.VPC.SelfLink,
+						BgpAsn:          cfg.NatBgpAsn,
+						EnableNat:       true,
+						NatNumAddresses: cfg.NatNumAddresses,
+					}, pulumi.DependsOn([]pulumi.Resource{hubVpc.VPC}))
+					if err != nil {
+						return err
+					}
 				}
 			}
 
@@ -266,10 +310,15 @@ func main() {
 				if cfg.PolicyID != "" {
 					hubPolicyID = pulumi.String(cfg.PolicyID)
 				}
+				// Prepend the bootstrap deploy service accounts (organization/networks/
+				// projects step SAs) to the perimeter members so the deploy pipeline is
+				// not locked out (upstream net-hubs.tf members/members_dry_run).
+				hubPerimeterMembers := mergeMembers(cfg.DeploySAMembers, cfg.VpcScMembers)
 				_, err = vpc_sc.NewVpcServiceControls(ctx, "hub-vpc-sc-perimeter", &vpc_sc.VpcServiceControlsArgs{
 					PolicyID:           hubPolicyID,
 					Prefix:             "c_hub",
-					Members:            cfg.VpcScMembers,
+					Members:            hubPerimeterMembers,
+					MembersDryRun:      hubPerimeterMembers,
 					ProjectNumbers:     pulumi.StringArray{hubOrgStack.GetStringOutput(pulumi.String("net_hub_project_number"))},
 					RestrictedServices: cfg.VpcScRestrictedServices,
 					Enforce:            cfg.EnforceVpcSc,
@@ -420,7 +469,7 @@ func main() {
 		// DNS peering from spoke to hub
 		_, err = networking.NewDnsZone(ctx, "dns-peering", &networking.DnsZoneArgs{
 			ProjectID:             pulumi.String(cfg.SpokeProjectID),
-			Name:                  fmt.Sprintf("dz-%s-svpc-spoke-to-dns-hub", cfg.EnvCode),
+			Name:                  fmt.Sprintf("dz-%s-svpc-to-dns-hub", cfg.EnvCode),
 			Domain:                cfg.Domain,
 			Type:                  "peering",
 			NetworkSelfLink:       spokeVpc.VPC.SelfLink,
@@ -430,15 +479,33 @@ func main() {
 			return err
 		}
 
-		// NAT routers on spoke (spokes don't get BGP routers in hub-and-spoke)
-		for _, reg := range []string{cfg.Region1, cfg.Region2} {
-			_, err = networking.NewCloudRouter(ctx, fmt.Sprintf("spoke-nat-%s", reg), &networking.RouterArgs{
-				ProjectID:       pulumi.String(cfg.SpokeProjectID),
-				Region:          reg,
-				Network:         spokeVpc.VPC.SelfLink,
-				BgpAsn:          cfg.NatBgpAsn,
-				EnableNat:       true,
-				NatNumAddresses: cfg.NatNumAddresses,
+		// NAT routers on spoke (spokes don't get BGP routers in hub-and-spoke).
+		// Gated on nat_enabled.
+		if cfg.NatEnabled {
+			for _, reg := range []string{cfg.Region1, cfg.Region2} {
+				_, err = networking.NewCloudRouter(ctx, fmt.Sprintf("spoke-nat-%s", reg), &networking.RouterArgs{
+					ProjectID:       pulumi.String(cfg.SpokeProjectID),
+					Region:          reg,
+					Network:         spokeVpc.VPC.SelfLink,
+					BgpAsn:          cfg.NatBgpAsn,
+					EnableNat:       true,
+					NatNumAddresses: cfg.NatNumAddresses,
+				}, pulumi.DependsOn([]pulumi.Resource{spokeVpc.VPC}))
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// Windows KMS activation route on spoke (upstream windows_activation_enabled).
+		if cfg.WindowsActivationEnabled {
+			_, err = compute.NewRoute(ctx, "spoke-windows-kms", &compute.RouteArgs{
+				Project:        pulumi.String(cfg.SpokeProjectID),
+				Name:           pulumi.String(fmt.Sprintf("rt-%s-svpc-spoke-1000-all-default-windows-kms", cfg.EnvCode)),
+				Network:        spokeVpc.VPC.ID(),
+				DestRange:      pulumi.String("35.190.247.13/32"),
+				NextHopGateway: pulumi.String("default-internet-gateway"),
+				Priority:       pulumi.Int(1000),
 			}, pulumi.DependsOn([]pulumi.Resource{spokeVpc.VPC}))
 			if err != nil {
 				return err
@@ -470,11 +537,14 @@ func main() {
 		var accessLevelName pulumi.StringOutput
 		var accessLevelDryRunName pulumi.StringOutput
 		{
+			// Prepend the bootstrap deploy service accounts to the perimeter members
+			// (upstream base_env members/members_dry_run).
+			spokePerimeterMembers := mergeMembers(cfg.DeploySAMembers, cfg.VpcScMembers)
 			perimeter, err := vpc_sc.NewVpcServiceControls(ctx, "vpc-sc-perimeter", &vpc_sc.VpcServiceControlsArgs{
 				PolicyID:              finalPolicyID,
 				Prefix:                fmt.Sprintf("%s_spoke", cfg.EnvCode),
-				Members:               cfg.VpcScMembers,
-				MembersDryRun:         cfg.VpcScMembers,
+				Members:               spokePerimeterMembers,
+				MembersDryRun:         spokePerimeterMembers,
 				ProjectNumbers:        pulumi.ToStringArray(cfg.VpcScProjects),
 				RestrictedServices:    cfg.VpcScRestrictedServices,
 				Enforce:               cfg.EnforceVpcSc,
@@ -581,11 +651,73 @@ type NetConfig struct {
 	SpokeGkeSvc2Cidr              string
 	HubSubnet1Cidr                string
 	HubSubnet2Cidr                string
+	HubProxy1Cidr                 string
+	HubProxy2Cidr                 string
 	FirewallAssociations          []string
 	FirewallPoliciesEnableLogging bool
 	DnsEnableLogging              bool
 	EnforceVpcSc                  bool
+	EnableTransitivity            bool
+	NatEnabled                    bool
+	WindowsActivationEnabled      bool
+	BootstrapStackName            string
+	DeploySAMembers               []string
 	VpcFlowLogs                   *VpcFlowLogsConfig
+}
+
+// readBootstrapDeploySAs reads the organization/networks/projects step deploy
+// service-account emails from the bootstrap stack (mirrors upstream
+// modules/base_env/remote.tf) and returns them as `serviceAccount:<email>`
+// members. Degrades gracefully to nil when the stack/outputs are unavailable
+// (e.g. unit tests with mocks, or a not-yet-deployed bootstrap stack).
+func readBootstrapDeploySAs(ctx *pulumi.Context, stackName string) []string {
+	if stackName == "" {
+		return nil
+	}
+	stack, err := pulumi.NewStackReference(ctx, "bootstrap", &pulumi.StackReferenceArgs{
+		Name: pulumi.String(stackName),
+	})
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, outName := range []string{
+		"organization_step_terraform_service_account_email",
+		"networks_step_terraform_service_account_email",
+		"projects_step_terraform_service_account_email",
+	} {
+		details, detErr := stack.GetOutputDetails(outName)
+		if detErr != nil || details.Value == nil {
+			continue
+		}
+		if email, ok := details.Value.(string); ok && email != "" {
+			out = append(out, "serviceAccount:"+email)
+		}
+	}
+	return out
+}
+
+// mergeMembers prepends the bootstrap deploy service-account members (organization/
+// networks/projects step SAs) ahead of the operator-supplied VPC-SC members,
+// de-duplicating. Mirrors upstream distinct(concat([...SAs...], additional_members)).
+func mergeMembers(deploySAs, members []string) []string {
+	seen := make(map[string]bool)
+	out := make([]string, 0, len(deploySAs)+len(members))
+	for _, m := range deploySAs {
+		if m == "" || seen[m] {
+			continue
+		}
+		seen[m] = true
+		out = append(out, m)
+	}
+	for _, m := range members {
+		if m == "" || seen[m] {
+			continue
+		}
+		seen[m] = true
+		out = append(out, m)
+	}
+	return out
 }
 
 func loadNetConfig(ctx *pulumi.Context) *NetConfig {
@@ -644,6 +776,32 @@ func loadNetConfig(ctx *pulumi.Context) *NetConfig {
 		c.EnforceVpcSc = false // TF defaults enforce_vpcsc=false (dry-run first)
 	}
 
+	if val, err := conf.TryBool("enable_hub_and_spoke_transitivity"); err == nil {
+		c.EnableTransitivity = val
+	} else {
+		c.EnableTransitivity = true // preserve prior always-on behavior
+	}
+
+	if val, err := conf.TryBool("nat_enabled"); err == nil {
+		c.NatEnabled = val
+	} else {
+		c.NatEnabled = true // preserve current behavior (upstream default is false)
+	}
+
+	if val, err := conf.TryBool("windows_activation_enabled"); err == nil {
+		c.WindowsActivationEnabled = val
+	} else {
+		c.WindowsActivationEnabled = false
+	}
+
+	// Bootstrap deploy service-account emails are read from the bootstrap stack in
+	// main() via readBootstrapDeploySAs (mirrors upstream modules/base_env/remote.tf);
+	// bootstrap_stack_name guards the lookup and degrades gracefully when unset.
+	c.BootstrapStackName = conf.Get("bootstrap_stack_name")
+	if c.BootstrapStackName == "" {
+		c.BootstrapStackName = "bootstrap"
+	}
+
 	if c.Region1 == "" {
 		c.Region1 = "us-central1"
 	}
@@ -670,12 +828,18 @@ func loadNetConfig(ctx *pulumi.Context) *NetConfig {
 	}
 
 	// Assign CIDRs based on EnvCode to avoid peering overlaps
-	// Defaults derived from reference architecture
+	// Hub defaults match upstream envs/shared/net-hubs.tf.
 	if c.HubSubnet1Cidr == "" {
-		c.HubSubnet1Cidr = "10.0.64.0/18"
+		c.HubSubnet1Cidr = "10.8.0.0/18"
 	}
 	if c.HubSubnet2Cidr == "" {
-		c.HubSubnet2Cidr = "10.1.64.0/18"
+		c.HubSubnet2Cidr = "10.9.0.0/18"
+	}
+	if c.HubProxy1Cidr == "" {
+		c.HubProxy1Cidr = "10.26.0.0/23"
+	}
+	if c.HubProxy2Cidr == "" {
+		c.HubProxy2Cidr = "10.27.0.0/23"
 	}
 
 	if c.EnvCode == "d" {

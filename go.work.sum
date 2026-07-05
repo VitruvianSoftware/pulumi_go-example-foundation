@@ -321,6 +321,7 @@ github.com/VitruvianSoftware/pulumi-library/go/pkg/cicd v0.2.0/go.mod h1:vOAJ7Mn
 github.com/VitruvianSoftware/pulumi-library/go/pkg/group v0.2.0/go.mod h1:gFq2yM8G7m3323lvVjwLuNRmIv39zGNh/am3B7fCjZA=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/iam v0.2.0/go.mod h1:KMQRsTWYHsK9rKi+BsOuhQkPWxRsEdBf8yPb9cErp/0=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/logging v0.2.0/go.mod h1:rsPbJwdWYNKzwKVc4oXoESEMzgyQq83LHHO+gopFw3o=
+github.com/VitruvianSoftware/pulumi-library/go/pkg/network v1.1.0/go.mod h1:WrHI/VAAZrIBtboqPhhsdo5JsDEc4+Nz6WwDo3cVEmY=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/networking v0.2.0/go.mod h1:cAm3CjuDUHS8s9WZCm4bg3kZMEeb0bDF6/n1LaT09go=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/policy v0.2.0/go.mod h1:vDyCkpYX1U1anIBGEDqLiQGsR7mOB7KA8t3XVnc9S4o=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/project v0.2.0/go.mod h1:XT8PLfQZFvl4odYxpFTQm4SlOnpiNQwKz83oTsakw6s=
