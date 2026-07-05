@@ -19,22 +19,22 @@ package main
 import (
 	"fmt"
 
-	"github.com/VitruvianSoftware/pulumi-library/go/pkg/project"
+	project "github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
 // OrgProjects holds outputs from all org-level project deployments.
 type OrgProjects struct {
-	AuditLogsProjectID     pulumi.StringOutput
-	BillingExportProjectID pulumi.StringOutput
-	SCCProjectID           pulumi.StringOutput
-	OrgKMSProjectID        pulumi.StringOutput
-	OrgSecretsProjectID    pulumi.StringOutput
-	InterconnectProjectID  pulumi.StringOutput
+	AuditLogsProjectID        pulumi.StringOutput
+	BillingExportProjectID    pulumi.StringOutput
+	SCCProjectID              pulumi.StringOutput
+	OrgKMSProjectID           pulumi.StringOutput
+	OrgSecretsProjectID       pulumi.StringOutput
+	InterconnectProjectID     pulumi.StringOutput
 	InterconnectProjectNumber pulumi.StringOutput // upstream: interconnect_project_number
-	NetHubProjectID        pulumi.StringOutput
-	NetHubProjectNumber    pulumi.StringOutput // upstream: net_hub_project_number
-	NetworkProjectIDs      map[string]pulumi.StringOutput
+	NetHubProjectID           pulumi.StringOutput
+	NetHubProjectNumber       pulumi.StringOutput // upstream: net_hub_project_number
+	NetworkProjectIDs         map[string]pulumi.StringOutput
 }
 
 // createProject is a helper that creates a standardized project using the
@@ -312,7 +312,7 @@ func deployOrgProjects(ctx *pulumi.Context, cfg *OrgConfig, folders *Folders) (*
 				"servicenetworking.googleapis.com",
 				"container.googleapis.com",
 				"logging.googleapis.com",
-				"cloudresourcemanager.googleapis.com",  // Gap 2: matches upstream network module
+				"cloudresourcemanager.googleapis.com", // Gap 2: matches upstream network module
 				"accesscontextmanager.googleapis.com", // Gap 2: needed for VPC Service Controls
 				"billingbudgets.googleapis.com",
 			},
@@ -346,5 +346,3 @@ func deployOrgProjects(ctx *pulumi.Context, cfg *OrgConfig, folders *Folders) (*
 		NetworkProjectIDs:         networkProjectIDs,
 	}, nil
 }
-
-
