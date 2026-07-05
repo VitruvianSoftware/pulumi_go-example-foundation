@@ -27,6 +27,7 @@ import (
 	"github.com/pulumiverse/pulumi-time/sdk/go/time"
 
 	networking "github.com/VitruvianSoftware/pulumi-library/go/pkg/network"
+	netpeering "github.com/VitruvianSoftware/pulumi-library/go/pkg/network_peering"
 	vpc_sc "github.com/VitruvianSoftware/pulumi-library/go/pkg/vpc_service_controls"
 )
 
@@ -37,6 +38,35 @@ func main() {
 		// Prepend the bootstrap deploy service accounts to the VPC-SC perimeter
 		// members (read live from the bootstrap stack, mirroring upstream).
 		cfg.DeploySAMembers = readBootstrapDeploySAs(ctx, cfg.BootstrapStackName)
+
+		// Resolve the org stack once for the whole stage. It publishes the net-hub
+		// project id (net_hub_project_id), the per-env spoke network project id
+		// (<env>_network_project_id) and the access-context-manager policy id/number
+		// consumed below. Reading the project ids here mirrors TF's
+		// data.terraform_remote_state.org wiring, so they no longer have to be
+		// duplicated in this stack's own config. GetOutputDetails resolves
+		// synchronously, so the values are usable as plain strings; each falls back
+		// to its config value when the org stack has not been deployed yet
+		// (e.g. preview / unit tests).
+		var orgStack *pulumi.StackReference
+		if cfg.OrgStackName != "" {
+			var err error
+			orgStack, err = pulumi.NewStackReference(ctx, "org", &pulumi.StackReferenceArgs{
+				Name: pulumi.String(cfg.OrgStackName),
+			})
+			if err != nil {
+				return err
+			}
+			// net_hub_project_id is needed by the hub stack and by each spoke
+			// (for the spoke<->hub peering reference).
+			if id := stackOutputString(orgStack, "net_hub_project_id"); id != "" {
+				cfg.HubProjectID = id
+			}
+			// <env>_network_project_id backs the spoke shared-VPC host (spoke branch only).
+			if id := stackOutputString(orgStack, fmt.Sprintf("%s_network_project_id", cfg.Env)); id != "" {
+				cfg.SpokeProjectID = id
+			}
+		}
 
 		// Compute environment-specific advertised IP ranges
 		advertisedRanges := []networking.AdvertisedIPRange{
@@ -299,14 +329,8 @@ func main() {
 
 			// VPC-SC perimeter on the hub project — created once here in the shared/hub
 			// stack that owns net-hub (TF applies it unconditionally in envs/shared).
-			if cfg.OrgStackName != "" {
-				hubOrgStack, err := pulumi.NewStackReference(ctx, "org", &pulumi.StackReferenceArgs{
-					Name: pulumi.String(cfg.OrgStackName),
-				})
-				if err != nil {
-					return err
-				}
-				var hubPolicyID pulumi.StringInput = hubOrgStack.GetStringOutput(pulumi.String("access_context_manager_policy_id"))
+			if orgStack != nil {
+				var hubPolicyID pulumi.StringInput = orgStack.GetStringOutput(pulumi.String("access_context_manager_policy_id"))
 				if cfg.PolicyID != "" {
 					hubPolicyID = pulumi.String(cfg.PolicyID)
 				}
@@ -319,7 +343,7 @@ func main() {
 					Prefix:             "c_hub",
 					Members:            hubPerimeterMembers,
 					MembersDryRun:      hubPerimeterMembers,
-					ProjectNumbers:     pulumi.StringArray{hubOrgStack.GetStringOutput(pulumi.String("net_hub_project_number"))},
+					ProjectNumbers:     pulumi.StringArray{orgStack.GetStringOutput(pulumi.String("net_hub_project_number"))},
 					RestrictedServices: cfg.VpcScRestrictedServices,
 					Enforce:            cfg.EnforceVpcSc,
 				})
@@ -399,28 +423,20 @@ func main() {
 			return err
 		}
 
-		// Bi-Directional VPC Peering (Spoke <-> Hub)
-		// Order matters: local peering first, then peer peering depends on it
+		// Bi-Directional VPC Peering (Spoke <-> Hub). The component creates both
+		// reciprocal peerings — the spoke side (imports the hub's custom routes)
+		// and the inverted hub side (exports them), ordered so the hub side
+		// depends on the spoke side. Explicit names reproduce the upstream
+		// "np-<local>-<peer>" convention.
 		hubVpcRef := fmt.Sprintf("projects/%s/global/networks/vpc-c-svpc-hub", cfg.HubProjectID)
 
-		spokeToHub, err := compute.NewNetworkPeering(ctx, "spoke-to-hub", &compute.NetworkPeeringArgs{
-			Network:            spokeVpc.VPC.SelfLink,
+		_, err = netpeering.NewNetworkPeering(ctx, "spoke-hub", &netpeering.NetworkPeeringArgs{
+			LocalNetwork:       spokeVpc.VPC.SelfLink,
 			PeerNetwork:        pulumi.String(hubVpcRef),
-			Name:               pulumi.String(fmt.Sprintf("np-%s-svpc-spoke-vpc-c-svpc-hub", cfg.EnvCode)),
-			ExportCustomRoutes: pulumi.Bool(false),
-			ImportCustomRoutes: pulumi.Bool(true), // Import hub's custom routes
+			ImportCustomRoutes: true, // spoke imports the hub's custom routes
+			LocalName:          fmt.Sprintf("np-%s-svpc-spoke-vpc-c-svpc-hub", cfg.EnvCode),
+			PeerName:           fmt.Sprintf("np-vpc-c-svpc-hub-%s-svpc-spoke", cfg.EnvCode),
 		})
-		if err != nil {
-			return err
-		}
-
-		_, err = compute.NewNetworkPeering(ctx, "hub-to-spoke", &compute.NetworkPeeringArgs{
-			Network:            pulumi.String(hubVpcRef),
-			PeerNetwork:        spokeVpc.VPC.SelfLink,
-			Name:               pulumi.String(fmt.Sprintf("np-vpc-c-svpc-hub-%s-svpc-spoke", cfg.EnvCode)),
-			ExportCustomRoutes: pulumi.Bool(true), // Export hub's custom routes to spoke
-			ImportCustomRoutes: pulumi.Bool(false),
-		}, pulumi.DependsOn([]pulumi.Resource{spokeToHub})) // Must create after spoke-to-hub
 		if err != nil {
 			return err
 		}
@@ -513,13 +529,7 @@ func main() {
 		}
 
 		var acmPolicyID pulumi.StringOutput
-		if cfg.OrgStackName != "" {
-			orgStack, err := pulumi.NewStackReference(ctx, "org", &pulumi.StackReferenceArgs{
-				Name: pulumi.String(cfg.OrgStackName),
-			})
-			if err != nil {
-				return err
-			}
+		if orgStack != nil {
 			acmPolicyID = orgStack.GetStringOutput(pulumi.String("access_context_manager_policy_id"))
 		} else {
 			acmPolicyID = pulumi.String("").ToStringOutput()
@@ -686,15 +696,28 @@ func readBootstrapDeploySAs(ctx *pulumi.Context, stackName string) []string {
 		"networks_step_terraform_service_account_email",
 		"projects_step_terraform_service_account_email",
 	} {
-		details, detErr := stack.GetOutputDetails(outName)
-		if detErr != nil || details.Value == nil {
-			continue
-		}
-		if email, ok := details.Value.(string); ok && email != "" {
+		if email := stackOutputString(stack, outName); email != "" {
 			out = append(out, "serviceAccount:"+email)
 		}
 	}
 	return out
+}
+
+// stackOutputString reads a single string output from a StackReference using
+// GetOutputDetails, which resolves synchronously so the value is usable as a
+// plain Go string. It returns "" when the output is absent or not yet available
+// (e.g. the referenced stack has not been deployed, or during preview / unit
+// tests with mocks), letting callers fall back to config.
+func stackOutputString(stack *pulumi.StackReference, name string) string {
+	details, err := stack.GetOutputDetails(name)
+	if err != nil || details.Value == nil {
+		return ""
+	}
+	s, ok := details.Value.(string)
+	if !ok {
+		return ""
+	}
+	return s
 }
 
 // mergeMembers prepends the bootstrap deploy service-account members (organization/
@@ -726,7 +749,7 @@ func loadNetConfig(ctx *pulumi.Context) *NetConfig {
 	c := &NetConfig{
 		Env:            conf.Require("env"),
 		EnvCode:        conf.Require("env_code"),
-		HubProjectID:   conf.Require("hub_project_id"),
+		HubProjectID:   conf.Get("hub_project_id"),
 		SpokeProjectID: conf.Get("spoke_project_id"),
 		Region1:        conf.Get("region1"),
 		Region2:        conf.Get("region2"),

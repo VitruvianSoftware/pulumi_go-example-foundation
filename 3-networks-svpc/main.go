@@ -58,6 +58,28 @@ func main() {
 		// PER-ENVIRONMENT (development, nonproduction, production)
 		// ====================================================================
 
+		// Resolve the org stack once: it publishes both the shared-VPC host
+		// project id (<env>_network_project_id) and the access-context-manager
+		// policy id that this stage consumes. Reading <env>_network_project_id
+		// here mirrors TF's data.terraform_remote_state.org wiring, so the
+		// network project id no longer has to be duplicated in this stack's own
+		// config. GetOutputDetails resolves synchronously, so the value is usable
+		// as a plain string below; it falls back to the project_id config value
+		// when the org stack has not been deployed yet (e.g. preview / tests).
+		var orgStack *pulumi.StackReference
+		if cfg.OrgStackName != "" {
+			var err error
+			orgStack, err = pulumi.NewStackReference(ctx, "org", &pulumi.StackReferenceArgs{
+				Name: pulumi.String(cfg.OrgStackName),
+			})
+			if err != nil {
+				return err
+			}
+			if id := stackOutputString(orgStack, fmt.Sprintf("%s_network_project_id", cfg.Env)); id != "" {
+				cfg.ProjectID = id
+			}
+		}
+
 		// Compute environment-specific advertised IP ranges
 		// Production advertises the Google DNS forwarding source range + PSC endpoint
 		// Other environments only advertise the PSC endpoint
@@ -270,13 +292,7 @@ func main() {
 
 		// Exports — matching TF 3-networks-svpc/envs/{env}/outputs.tf
 		var acmPolicyID pulumi.StringOutput
-		if cfg.OrgStackName != "" {
-			orgStack, err := pulumi.NewStackReference(ctx, "org", &pulumi.StackReferenceArgs{
-				Name: pulumi.String(cfg.OrgStackName),
-			})
-			if err != nil {
-				return err
-			}
+		if orgStack != nil {
 			acmPolicyID = orgStack.GetStringOutput(pulumi.String("access_context_manager_policy_id"))
 		} else {
 			acmPolicyID = pulumi.String("").ToStringOutput()
@@ -300,12 +316,8 @@ func main() {
 					"networks_step_terraform_service_account_email",
 					"projects_step_terraform_service_account_email",
 				} {
-					details, detErr := bootstrapStack.GetOutputDetails(outName)
-					if detErr != nil || details.Value == nil {
-						continue
-					}
-					email, ok := details.Value.(string)
-					if !ok || email == "" {
+					email := stackOutputString(bootstrapStack, outName)
+					if email == "" {
 						continue
 					}
 					saMembers = append(saMembers, "serviceAccount:"+email)
@@ -493,13 +505,30 @@ type NetConfig struct {
 	VpcFlowLogs                   *VpcFlowLogsConfig
 }
 
+// stackOutputString reads a single string output from a StackReference using
+// GetOutputDetails, which resolves synchronously so the value is usable as a
+// plain Go string. It returns "" when the output is absent or not yet available
+// (e.g. the referenced stack has not been deployed, or during preview / unit
+// tests with mocks), letting callers fall back to config.
+func stackOutputString(stack *pulumi.StackReference, name string) string {
+	details, err := stack.GetOutputDetails(name)
+	if err != nil || details.Value == nil {
+		return ""
+	}
+	s, ok := details.Value.(string)
+	if !ok {
+		return ""
+	}
+	return s
+}
+
 func loadNetConfig(ctx *pulumi.Context) *NetConfig {
 	conf := config.New(ctx, "")
 
 	c := &NetConfig{
 		Env:                conf.Require("env"),
 		EnvCode:            conf.Require("env_code"),
-		ProjectID:          conf.Require("project_id"),
+		ProjectID:          conf.Get("project_id"),
 		Region1:            conf.Get("region1"),
 		Region2:            conf.Get("region2"),
 		ParentID:           conf.Require("parent_id"),
