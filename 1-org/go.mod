@@ -126,12 +126,7 @@ require (
 	lukechampine.com/frand v1.5.1 // indirect
 )
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/cai_monitoring => ../../../library/go/pkg/cai_monitoring
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/centralized_logging => ../../../library/go/pkg/centralized_logging
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/org_policy => ../../../library/go/pkg/org_policy
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory => ../../../library/go/pkg/project_factory
 
-replace github.com/VitruvianSoftware/pulumi-library/go => ../../../library/go

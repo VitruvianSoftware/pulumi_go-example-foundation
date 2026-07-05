@@ -124,6 +124,4 @@ require (
 	lukechampine.com/frand v1.4.2 // indirect
 )
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/compute_instance => ../../../library/go/pkg/compute_instance
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/instance_template => ../../../library/go/pkg/instance_template

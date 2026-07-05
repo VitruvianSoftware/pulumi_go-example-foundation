@@ -127,16 +127,9 @@ require (
 	lukechampine.com/frand v1.5.1 // indirect
 )
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/bootstrap => ../../../library/go/pkg/bootstrap
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/cicd => ../../../library/go/pkg/cicd
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/cloud_storage => ../../../library/go/pkg/cloud_storage
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/google_group => ../../../library/go/pkg/google_group
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/iam => ../../../library/go/pkg/iam
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory => ../../../library/go/pkg/project_factory
 
-replace github.com/VitruvianSoftware/pulumi-library/go => ../../../library/go

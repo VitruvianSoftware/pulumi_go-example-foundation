@@ -124,8 +124,5 @@ require (
 	lukechampine.com/frand v1.4.2 // indirect
 )
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/network => ../../../library/go/pkg/network
 
-replace github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory => ../../../library/go/pkg/project_factory
 
-replace github.com/VitruvianSoftware/pulumi-library/go => ../../../library/go
