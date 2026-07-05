@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	libnet "github.com/VitruvianSoftware/pulumi-library/go/pkg/network"
-	netpeering "github.com/VitruvianSoftware/pulumi-library/go/pkg/network_peering"
 	libproject "github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory"
+	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/compute"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/dns"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/tags"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -86,20 +86,27 @@ func deployPeeringNetwork(
 		return nil, err
 	}
 
-	// 3. Bi-directional VPC Peering (peering project <-> shared VPC host). The
-	// component creates both reciprocal peerings — the peering-project side
-	// (imports the host's custom routes) and the inverted host side (exports
-	// them), ordered so the host side depends on the peering side. Explicit
-	// names preserve the upstream naming.
+	// 3. Bi-directional VPC Peering (peering project <-> shared VPC host)
 	hostVpcRef := pulumi.Sprintf("projects/%s/global/networks/vpc-%s-svpc", networkProjectID, cfg.EnvCode)
 
-	_, err = netpeering.NewNetworkPeering(ctx, "peering-host", &netpeering.NetworkPeeringArgs{
-		LocalNetwork:       peeringVpc.VPC.SelfLink,
+	peeringToHost, err := compute.NewNetworkPeering(ctx, "peering-to-host", &compute.NetworkPeeringArgs{
+		Network:            peeringVpc.VPC.SelfLink,
 		PeerNetwork:        hostVpcRef,
-		ImportCustomRoutes: true, // peering project imports the host's custom routes
-		LocalName:          fmt.Sprintf("%s-%s-peering-base-to-svpc", cfg.BusinessCode, cfg.EnvCode),
-		PeerName:           fmt.Sprintf("svpc-to-%s-%s-peering-base", cfg.BusinessCode, cfg.EnvCode),
+		Name:               pulumi.String(fmt.Sprintf("%s-%s-peering-base-to-svpc", cfg.BusinessCode, cfg.EnvCode)),
+		ExportCustomRoutes: pulumi.Bool(false),
+		ImportCustomRoutes: pulumi.Bool(true),
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = compute.NewNetworkPeering(ctx, "host-to-peering", &compute.NetworkPeeringArgs{
+		Network:            hostVpcRef,
+		PeerNetwork:        peeringVpc.VPC.SelfLink,
+		Name:               pulumi.String(fmt.Sprintf("svpc-to-%s-%s-peering-base", cfg.BusinessCode, cfg.EnvCode)),
+		ExportCustomRoutes: pulumi.Bool(true),
+		ImportCustomRoutes: pulumi.Bool(false),
+	}, pulumi.DependsOn([]pulumi.Resource{peeringToHost}))
 	if err != nil {
 		return nil, err
 	}

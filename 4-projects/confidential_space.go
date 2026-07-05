@@ -52,7 +52,6 @@ func deployConfidentialSpaceProject(
 	networkProjectID pulumi.StringOutput,
 	perimeterName pulumi.StringOutput,
 ) (*ConfidentialSpaceResult, error) {
-
 	// 1. Create the Confidential Space project
 	confProject, err := project.NewProject(ctx, "bu-conf-space-project", &project.ProjectArgs{
 		DefaultServiceAccount: "deprivilege",
