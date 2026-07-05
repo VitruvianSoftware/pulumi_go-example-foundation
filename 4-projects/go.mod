@@ -4,6 +4,7 @@ go 1.26.1
 
 require (
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/network v1.0.2
+	github.com/VitruvianSoftware/pulumi-library/go/pkg/network_peering v0.3.0
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.2
 	github.com/pulumi/pulumi-gcp/sdk/v9 v9.20.0
 	github.com/pulumi/pulumi-random/sdk/v4 v4.19.2

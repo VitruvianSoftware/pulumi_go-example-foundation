@@ -11,6 +11,8 @@ github.com/VitruvianSoftware/pulumi-library/go v0.4.1-0.20260703174208-a71371f11
 github.com/VitruvianSoftware/pulumi-library/go v0.4.1-0.20260703174208-a71371f11968/go.mod h1:ky/UwWj4SMMTgFZtE1eEPu0ISOBCnE0E5GtEQ6lnzIM=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/network v1.0.2 h1:jQdsGmd544GwwDFrUeR0sb1TjvjPEP3fmyeuA4lNyBw=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/network v1.0.2/go.mod h1:WrHI/VAAZrIBtboqPhhsdo5JsDEc4+Nz6WwDo3cVEmY=
+github.com/VitruvianSoftware/pulumi-library/go/pkg/network_peering v0.3.0 h1:6nnKDLFRCmwePGwG+KKzyOGMopIw0Tc/cjV8UmDr2L4=
+github.com/VitruvianSoftware/pulumi-library/go/pkg/network_peering v0.3.0/go.mod h1:YbXhniLzIALZehyvroQox89iZ42pySMybgpwEnChT6A=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.2 h1:SDqkkSArop8MK9wzESw+1JqOE282cB8ku9SowwUYWkQ=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.2/go.mod h1:iomobDL3f/YLmhazoesfr+zA2iSPAVEp3+eNItzsixE=
 github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da h1:KjTM2ks9d14ZYCvmHS9iAKVt9AyzRSqNU1qabPih5BY=
