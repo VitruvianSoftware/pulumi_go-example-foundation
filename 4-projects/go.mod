@@ -3,7 +3,7 @@ module foundation-4-projects
 go 1.26.2
 
 require (
-	github.com/VitruvianSoftware/pulumi-library/go/pkg/network/v2 v2.0.0-00010101000000-000000000000
+	github.com/VitruvianSoftware/pulumi-library/go/pkg/network/v2 v2.0.3
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.2
 	github.com/pulumi/pulumi-gcp/sdk/v9 v9.29.0
 	github.com/pulumi/pulumi-random/sdk/v4 v4.21.0
