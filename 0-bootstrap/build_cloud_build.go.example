@@ -37,6 +37,8 @@
 //
 // 1. Artifact Registry — hosts the custom Pulumi Docker image
 // 2. Cloud Build Triggers — per-stage plan/apply triggers connected to GitHub
+// 3. Cloud Build Private Worker Pool — modules/cb-private-pool (peered VPC),
+//    mirroring upstream's module "tf_private_pool" in build_cb.tf
 //
 // PREREQUISITES (GitHub source):
 //
@@ -55,6 +57,8 @@ package main
 import (
 	"fmt"
 
+	cbprivatepool "foundation-0-bootstrap/modules/cb-private-pool"
+
 	libcicd "github.com/VitruvianSoftware/pulumi-library/pkg/cicd"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/serviceaccount"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -64,6 +68,9 @@ import (
 type CloudBuildOutputs struct {
 	CloudBuildProjectID pulumi.StringOutput
 	ArtifactRepoName    pulumi.StringOutput
+	// PrivatePool is the Cloud Build private worker pool component
+	// (modules/cb-private-pool), consumed by outputs_cb.go.
+	PrivatePool *cbprivatepool.CbPrivatePool
 }
 
 // deployCloudBuild provisions the Cloud Build CI/CD infrastructure in the
@@ -124,8 +131,32 @@ func deployCloudBuild(ctx *pulumi.Context, cfg *Config, cicd *CICDProject, sas m
 		return nil, err
 	}
 
+	// ========================================================================
+	// Cloud Build Private Worker Pool — mirrors upstream build_cb.tf's
+	// module "tf_private_pool" (./modules/cb-private-pool): a private pool
+	// peered to a module-created VPC.
+	// ========================================================================
+	privatePool, err := cbprivatepool.NewCbPrivatePool(ctx, "tf-private-pool", &cbprivatepool.CbPrivatePoolArgs{
+		ProjectID: cicd.ProjectID,
+		PrivateWorkerPool: cbprivatepool.PrivateWorkerPoolConfig{
+			Region:                cfg.DefaultRegion,
+			EnableNetworkPeering:  true,
+			CreatePeeredNetwork:   true,
+			PeeredNetworkSubnetIP: "10.3.0.0/24",
+			PeeringAddress:        "192.168.0.0",
+			PeeringPrefixLength:   24,
+		},
+		VPNConfiguration: cbprivatepool.VPNConfiguration{
+			EnableVPN: false,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	outputs.CloudBuildProjectID = cicd.ProjectID
 	outputs.ArtifactRepoName = cb.ArtifactRegistry.Name
+	outputs.PrivatePool = privatePool
 
 	return outputs, nil
 }

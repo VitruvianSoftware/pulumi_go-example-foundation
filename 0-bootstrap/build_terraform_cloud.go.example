@@ -17,15 +17,35 @@
 // ============================================================================
 //
 // This file is an EXAMPLE showing how to replace the default GitHub Actions
-// CI/CD provider with Terraform Cloud Agents on GKE.
-// This mirrors the Terraform foundation's `build_terraform_cloud.tf.example`.
+// CI/CD provider with cloud-backend agents on GKE. It mirrors the Terraform
+// foundation's `build_terraform_cloud.tf.example`.
 //
-// To use TFC instead of GitHub Actions:
+// ADAPTATION — Terraform Cloud → Pulumi Cloud: upstream provisions Terraform
+// Cloud workspaces/agent pools (tfe provider) and runs hashicorp/tfc-agent on
+// GKE. Our backend is Pulumi Cloud, so this example keeps the upstream file
+// and module names for structural parity but runs the Pulumi Deployments
+// self-hosted agent via modules/tfc-agent-gke (see that module's doc comment
+// for the full mapping). Upstream's tfe_* resources (workspaces, agent pool,
+// agent token) have no in-code analog here: Pulumi Cloud stacks/deployment
+// settings + the agent pool are created in the Pulumi Cloud console or via
+// the pulumiservice provider, and the resulting agent pool token is passed
+// in as config (documented stub).
+//
+// To use this instead of GitHub Actions:
 //
 // 1. Rename this file: build_terraform_cloud.go.example → build_terraform_cloud.go
-// 2. Remove or rename: build_github_actions.go → build_github_actions.go.bak
-// 3. Update main.go to call deployTFCBuild instead of deployGitHubActionsBuild
-// 4. Run `pulumi up` to provision the TFC infrastructure.
+// 2. Rename outputs_terraform_cloud.go.example → outputs_terraform_cloud.go
+// 3. Remove or rename: build_github_actions.go → build_github_actions.go.bak
+//    (and outputs_github.go → outputs_github.go.bak)
+// 4. Update main.go to call deployTFCBuild instead of deployGitHubActionsBuild
+//    and exportTerraformCloudOutputs instead of exportGitHubOutputs
+// 5. Run `pulumi up` to provision the infrastructure.
+//
+// NOTE (mirrors upstream's commented kubernetes provider): the in-cluster
+// agent Deployment can only be applied once the private GKE cluster is
+// reachable. Set DeployKubernetesResources to false for the first apply,
+// then flip it to true — the Pulumi equivalent of upstream's "un-comment the
+// kubernetes provider after the first apply" README instruction.
 //
 // ============================================================================
 
@@ -34,7 +54,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/container"
+	tfcagentgke "foundation-0-bootstrap/modules/tfc-agent-gke"
+
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/organizations"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/projects"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/serviceaccount"
@@ -44,15 +65,25 @@ import (
 // TFCBuildOutputs holds the outputs from Terraform Cloud provisioning.
 type TFCBuildOutputs struct {
 	CICDProjectID pulumi.StringOutput
+	// AgentGke is the agent cluster component (modules/tfc-agent-gke),
+	// consumed by outputs_terraform_cloud.go. Nil when agents are disabled.
+	AgentGke *tfcagentgke.TfcAgentGke
 }
 
-// deployTFCBuild provisions the infrastructure for a Terraform Cloud agent
-// running on GKE. This includes the project, network, NAT, GKE cluster,
-// and IAM bindings.
-func deployTFCBuild(ctx *pulumi.Context, cfg *Config, sas map[string]*serviceaccount.Account) (*TFCBuildOutputs, error) {
+// deployTFCBuild provisions the infrastructure for a cloud-backend agent
+// running on GKE: the CI/CD project and, when enableCloudAgents is true
+// (upstream var.enable_tfc_cloud_agents), the modules/tfc-agent-gke stack.
+func deployTFCBuild(ctx *pulumi.Context, cfg *Config, folderID pulumi.StringOutput, sas map[string]*serviceaccount.Account) (*TFCBuildOutputs, error) {
 	outputs := &TFCBuildOutputs{}
 
-	// Create CICD Project
+	// Mirrors: var.enable_tfc_cloud_agents (default false). Wire to config.
+	enableCloudAgents := false
+	// Mirrors: tfe_agent_token.tfc_agent_token — ADAPTED: create a
+	// Deployments agent pool in the Pulumi Cloud console and pass its access
+	// token in as a secret config value.
+	agentToken := pulumi.String("") // Replace with: conf.RequireSecret("pulumi_agent_pool_token")
+
+	// Create CICD Project — mirrors upstream module "tfc_cicd".
 	projectPrefix := cfg.ProjectPrefix
 	if projectPrefix == "" {
 		projectPrefix = "prj"
@@ -60,7 +91,7 @@ func deployTFCBuild(ctx *pulumi.Context, cfg *Config, sas map[string]*serviceacc
 	cicdProject, err := projects.NewProject(ctx, "cicd-project", &projects.ProjectArgs{
 		ProjectId:      pulumi.String(fmt.Sprintf("%s-b-cicd", projectPrefix)),
 		Name:           pulumi.String(fmt.Sprintf("%s-b-cicd", projectPrefix)),
-		FolderId:       pulumi.String(cfg.FolderID),
+		FolderId:       folderID,
 		BillingAccount: pulumi.String(cfg.BillingAccount),
 	})
 	if err != nil {
@@ -68,64 +99,48 @@ func deployTFCBuild(ctx *pulumi.Context, cfg *Config, sas map[string]*serviceacc
 	}
 	outputs.CICDProjectID = cicdProject.ProjectId
 
-	// TFC Agent Service Account
-	agentSA, err := serviceaccount.NewAccount(ctx, "tfc-agent-sa", &serviceaccount.AccountArgs{
-		Project:     cicdProject.ProjectId,
-		AccountId:   pulumi.String("sa-tfc-agent"),
-		DisplayName: pulumi.String("TFC Agent Service Account"),
-	})
-	if err != nil {
-		return nil, err
+	// Mirrors: module "tfc_agent_gke" (./modules/tfc-agent-gke) with
+	// count = var.enable_tfc_cloud_agents. Upstream reuses the bootstrap
+	// stage SA for the agent nodes (create_service_account = false).
+	if enableCloudAgents {
+		bootstrapSA := sas["bootstrap"]
+		createSA := false
+		// First apply: keep the in-cluster resources off until the private
+		// cluster is reachable (see the file header NOTE).
+		deployK8s := false
+		agentGke, err := tfcagentgke.NewTfcAgentGke(ctx, "tfc-agent-gke", &tfcagentgke.TfcAgentGkeArgs{
+			ProjectID:                 cicdProject.ProjectId,
+			ProjectNumber:             cicdProject.Number,
+			Region:                    cfg.DefaultRegion,
+			AgentToken:                agentToken,
+			CreateServiceAccount:      &createSA,
+			ServiceAccountEmail:       bootstrapSA.Email,
+			ServiceAccountID:          bootstrapSA.Name,
+			DeployKubernetesResources: &deployK8s,
+		})
+		if err != nil {
+			return nil, err
+		}
+		outputs.AgentGke = agentGke
+
+		// Grant roles/browser to the agent SA at the Org level.
+		_, err = organizations.NewIAMMember(ctx, "tfc-sa-org-browser", &organizations.IAMMemberArgs{
+			OrgId:  pulumi.String(cfg.OrgID),
+			Role:   pulumi.String("roles/browser"),
+			Member: pulumi.Sprintf("serviceAccount:%s", bootstrapSA.Email),
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	// GKE Cluster for TFC Agents
-	_, err = container.NewCluster(ctx, "tfc-agent-cluster", &container.ClusterArgs{
-		Project:                 cicdProject.ProjectId,
-		Name:                    pulumi.String("tfc-agent-cluster"),
-		Location:                pulumi.String(cfg.DefaultRegion),
-		InitialNodeCount:        pulumi.Int(1),
-		RemoveDefaultNodePool:   pulumi.Bool(true),
-		// Network config would normally go here
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// GKE Node Pool
-	_, err = container.NewNodePool(ctx, "tfc-agent-nodepool", &container.NodePoolArgs{
-		Project:  cicdProject.ProjectId,
-		Name:     pulumi.String("tfc-agent-pool"),
-		Cluster:  pulumi.String("tfc-agent-cluster"),
-		Location: pulumi.String(cfg.DefaultRegion),
-		NodeCount: pulumi.Int(1),
-		NodeConfig: &container.NodePoolNodeConfigArgs{
-			MachineType:    pulumi.String("n1-standard-4"),
-			ServiceAccount: agentSA.Email,
-			OauthScopes: pulumi.StringArray{
-				pulumi.String("https://www.googleapis.com/auth/cloud-platform"),
-			},
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Grant roles/browser to the TFC SA at the Org level
-	_, err = organizations.NewIAMMember(ctx, "tfc-sa-org-browser", &organizations.IAMMemberArgs{
-		OrgId:  pulumi.String(cfg.OrgID),
-		Role:   pulumi.String("roles/browser"),
-		Member: pulumi.Sprintf("serviceAccount:%s", agentSA.Email),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Allow TFC SA to impersonate the Terraform environment SAs
-	for _, sa := range sas {
-		_, err = serviceaccount.NewIAMMember(ctx, fmt.Sprintf("tfc-impersonate-%s", sa.Name), &serviceaccount.IAMMemberArgs{
+	// Mirrors: google_service_account_iam_member.self_impersonate — allow
+	// each stage SA to create tokens for itself (agent execution path).
+	for key, sa := range sas {
+		_, err = serviceaccount.NewIAMMember(ctx, fmt.Sprintf("self-impersonate-%s", key), &serviceaccount.IAMMemberArgs{
 			ServiceAccountId: sa.Name,
 			Role:             pulumi.String("roles/iam.serviceAccountTokenCreator"),
-			Member:           pulumi.Sprintf("serviceAccount:%s", agentSA.Email),
+			Member:           pulumi.Sprintf("serviceAccount:%s", sa.Email),
 		})
 		if err != nil {
 			return nil, err

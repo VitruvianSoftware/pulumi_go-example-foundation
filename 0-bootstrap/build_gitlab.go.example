@@ -32,7 +32,8 @@
 // 5. Run `pulumi up` to provision the GitLab WIF infrastructure.
 //
 // ============================================================================
-// WHAT THIS CREATES:
+// WHAT THIS CREATES (via modules/gitlab-oidc, mirroring upstream's
+// module "gitlab_oidc" in build_gitlab.tf.example):
 //
 // 1. Workload Identity Pool — "foundation-pool"
 // 2. Workload Identity Pool OIDC Provider — "foundation-gl-provider"
@@ -46,7 +47,8 @@ package main
 import (
 	"fmt"
 
-	libcicd "github.com/VitruvianSoftware/pulumi-library/pkg/cicd"
+	gitlaboidc "foundation-0-bootstrap/modules/gitlab-oidc"
+
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/serviceaccount"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
@@ -97,26 +99,28 @@ func deployGitLabBuild(ctx *pulumi.Context, cfg *Config, cicd *CICDProject, sas 
 		"proj":      "", // Replace with: cfg.GitLabRepoProj
 	}
 
-	saMappings := make(map[string]libcicd.SAMappingEntry)
+	saMappings := make(map[string]gitlaboidc.SAMappingEntry)
 	for key, sa := range sas {
 		repo := stageRepos[key]
 		if repo == "" {
 			continue
 		}
 
-		saMappings[key] = libcicd.SAMappingEntry{
+		saMappings[key] = gitlaboidc.SAMappingEntry{
 			SAName:    sa.Name,
-			Attribute: pulumi.String(fmt.Sprintf("attribute.project_path/%s/%s", gitlabOwner, repo)),
+			Attribute: fmt.Sprintf("attribute.project_path/%s/%s", gitlabOwner, repo),
 		}
 	}
 
-	gitlabOidc, err := libcicd.NewGitLabOIDC(ctx, "foundation-wif", &libcicd.GitLabOIDCArgs{
+	// Mirrors: module "gitlab_oidc" (./modules/gitlab-oidc) in upstream
+	// build_gitlab.tf.example.
+	gitlabOidc, err := gitlaboidc.NewGitlabOidc(ctx, "gitlab-oidc", &gitlaboidc.GitlabOidcArgs{
 		ProjectID:          cicd.ProjectID,
-		PoolID:             pulumi.String("foundation-pool"),
-		ProviderID:         pulumi.String("foundation-gl-provider"),
+		PoolID:             "foundation-pool",
+		ProviderID:         "foundation-gl-provider",
 		AttributeCondition: pulumi.String(fmt.Sprintf("assertion.project_path.startsWith('%s/')", gitlabOwner)),
 		SAMapping:          saMappings,
-		// IssuerUri defaults to https://gitlab.com if not set
+		// IssuerURI defaults to https://gitlab.com if not set
 	})
 	if err != nil {
 		return nil, err
@@ -144,8 +148,8 @@ func deployGitLabBuild(ctx *pulumi.Context, cfg *Config, cicd *CICDProject, sas 
 	// ========================================================================
 	// 5. Outputs
 	// ========================================================================
-	outputs.WIFPoolName = gitlabOidc.Pool.Name
-	outputs.WIFProviderName = gitlabOidc.Provider.Name
+	outputs.WIFPoolName = gitlabOidc.PoolName
+	outputs.WIFProviderName = gitlabOidc.ProviderName
 
 	return outputs, nil
 }
