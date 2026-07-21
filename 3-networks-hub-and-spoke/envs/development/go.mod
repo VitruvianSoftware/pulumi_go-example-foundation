@@ -4,6 +4,7 @@ go 1.26.2
 
 require (
 	foundation-3-networks-hub-and-spoke/modules v0.0.0-00010101000000-000000000000
+	github.com/VitruvianSoftware/pulumi-library/go/pkg/network/v2 v2.0.3
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/vpc_service_controls v1.0.2
 	github.com/pulumi/pulumi-gcp/sdk/v9 v9.30.0
 	github.com/pulumi/pulumi/sdk/v3 v3.252.0
@@ -14,7 +15,6 @@ require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
-	github.com/VitruvianSoftware/pulumi-library/go/pkg/network/v2 v2.0.3 // indirect
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
@@ -125,6 +125,3 @@ require (
 )
 
 replace foundation-3-networks-hub-and-spoke/modules => ../../modules
-
-
-
