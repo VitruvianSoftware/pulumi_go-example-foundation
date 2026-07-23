@@ -6,8 +6,8 @@ require (
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/cloud_run v0.3.0
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/compute_instance v0.2.3
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/instance_template v0.2.4
-	github.com/pulumi/pulumi-gcp/sdk/v9 v9.30.0
-	github.com/pulumi/pulumi/sdk/v3 v3.252.0
+	github.com/pulumi/pulumi-gcp/sdk/v9 v9.31.0
+	github.com/pulumi/pulumi/sdk/v3 v3.253.0
 	github.com/pulumiverse/pulumi-time/sdk v0.1.0
 )
 
@@ -119,3 +119,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
+
+
+
