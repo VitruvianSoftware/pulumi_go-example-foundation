@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	foundation-5-app-infra/modules v0.0.0-00010101000000-000000000000
-	github.com/pulumi/pulumi/sdk/v3 v3.252.0
+	github.com/pulumi/pulumi/sdk/v3 v3.253.0
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -78,7 +78,7 @@ require (
 	github.com/pkg/term v1.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
-	github.com/pulumi/pulumi-gcp/sdk/v9 v9.30.0 // indirect
+	github.com/pulumi/pulumi-gcp/sdk/v9 v9.31.0 // indirect
 	github.com/pulumiverse/pulumi-time/sdk v0.1.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
@@ -124,8 +124,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
-
-
-
 
 replace foundation-5-app-infra/modules => ../../modules
