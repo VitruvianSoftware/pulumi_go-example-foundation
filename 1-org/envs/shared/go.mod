@@ -18,7 +18,6 @@ require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
-	github.com/VitruvianSoftware/pulumi-library/go v0.5.1 // indirect
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/cai_monitoring v1.0.2 // indirect
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/centralized_logging v1.0.2 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
@@ -121,10 +120,15 @@ require (
 	golang.org/x/tools v0.47.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260630182238-925bb5da69e7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260630182238-925bb5da69e7 // indirect
-	google.golang.org/grpc v1.82.0 // indirect
+	google.golang.org/grpc v1.82.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.5.1 // indirect
 )
 
 replace foundation-1-org/modules => ../../modules
+
+
+
+
+
