@@ -18,7 +18,6 @@ require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
-	github.com/VitruvianSoftware/pulumi-library/go v0.5.1 // indirect
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/cai_monitoring v1.0.2 // indirect
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/centralized_logging v1.0.2 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
@@ -59,7 +58,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kevinburke/ssh_config v1.6.0 // indirect
-	github.com/klauspost/compress v1.19.0 // indirect
+	github.com/klauspost/compress v1.18.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
@@ -127,3 +126,8 @@ require (
 )
 
 replace foundation-1-org/modules => ../../modules
+
+
+
+
+
