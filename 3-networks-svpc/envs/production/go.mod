@@ -5,8 +5,8 @@ go 1.26.2
 require (
 	foundation-3-networks-svpc/modules v0.0.0-00010101000000-000000000000
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/vpc_service_controls v1.0.2
-	github.com/pulumi/pulumi-gcp/sdk/v9 v9.31.0
-	github.com/pulumi/pulumi/sdk/v3 v3.254.0
+	github.com/pulumi/pulumi-gcp/sdk/v9 v9.32.1
+	github.com/pulumi/pulumi/sdk/v3 v3.255.0
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -123,3 +123,6 @@ require (
 )
 
 replace foundation-3-networks-svpc/modules => ../../modules
+
+
+
