@@ -12,6 +12,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
+	github.com/VitruvianSoftware/pulumi-library/go v0.5.1 // indirect
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.2 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
@@ -71,7 +72,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/term v1.1.0 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
-	github.com/pulumi/pulumi-command/sdk v1.2.1 // indirect
 	github.com/pulumi/pulumi-gcp/sdk/v9 v9.34.1 // indirect
 	github.com/pulumi/pulumi-random/sdk/v4 v4.21.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
@@ -120,5 +120,3 @@ require (
 )
 
 replace foundation-2-environments/modules => ../../modules
-
-
