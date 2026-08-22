@@ -3,11 +3,11 @@ module foundation-0-bootstrap
 go 1.26.2
 
 require (
-	github.com/VitruvianSoftware/pulumi-library/go/pkg/bootstrap/v2 v2.1.2
-	github.com/VitruvianSoftware/pulumi-library/go/pkg/cicd v0.4.2
+	github.com/VitruvianSoftware/pulumi-library/go/pkg/bootstrap/v2 v2.1.4
+	github.com/VitruvianSoftware/pulumi-library/go/pkg/cicd v0.6.1
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/cloud_storage v1.0.2
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/google_group v1.0.2
-	github.com/VitruvianSoftware/pulumi-library/go/pkg/iam v0.4.2
+	github.com/VitruvianSoftware/pulumi-library/go/pkg/iam v0.6.2
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.2
 	github.com/pulumi/pulumi-gcp/sdk/v9 v9.34.1
 	github.com/pulumi/pulumi-github/sdk/v6 v6.15.0
@@ -79,6 +79,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/term v1.1.0 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
+	github.com/pulumi/pulumi-command/sdk v1.2.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
@@ -123,3 +124,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.5.1 // indirect
 )
+
+
+
+
+
+
+

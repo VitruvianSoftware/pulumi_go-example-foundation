@@ -3,7 +3,7 @@ module foundation-4-projects/modules
 go 1.26.2
 
 require (
-	github.com/VitruvianSoftware/pulumi-library/go/pkg/network/v2 v2.0.3
+	github.com/VitruvianSoftware/pulumi-library/go/pkg/network/v2 v2.1.1
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.2
 	github.com/pulumi/pulumi-command/sdk v1.2.1
 	github.com/pulumi/pulumi-gcp/sdk/v9 v9.34.1
@@ -118,3 +118,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
+
+
+

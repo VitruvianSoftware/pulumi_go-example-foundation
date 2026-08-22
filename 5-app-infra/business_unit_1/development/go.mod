@@ -12,9 +12,9 @@ require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
-	github.com/VitruvianSoftware/pulumi-library/go/pkg/cloud_run v0.3.0 // indirect
-	github.com/VitruvianSoftware/pulumi-library/go/pkg/compute_instance v0.2.3 // indirect
-	github.com/VitruvianSoftware/pulumi-library/go/pkg/instance_template v0.2.4 // indirect
+	github.com/VitruvianSoftware/pulumi-library/go/pkg/cloud_run v1.0.1 // indirect
+	github.com/VitruvianSoftware/pulumi-library/go/pkg/compute_instance v0.4.1 // indirect
+	github.com/VitruvianSoftware/pulumi-library/go/pkg/instance_template v0.4.1 // indirect
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
@@ -120,5 +120,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
+
+
+
 
 replace foundation-5-app-infra/modules => ../../modules
