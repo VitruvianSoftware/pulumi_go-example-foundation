@@ -10,8 +10,8 @@ github.com/VitruvianSoftware/pulumi-library/go v0.5.1 h1:gpMqW+TE/NKcV+tL75laQt+
 github.com/VitruvianSoftware/pulumi-library/go v0.5.1/go.mod h1:ky/UwWj4SMMTgFZtE1eEPu0ISOBCnE0E5GtEQ6lnzIM=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/network/v2 v2.1.1 h1:raqMCzZiX02uN9C9aCVn+BBNshdrSZwF1/Gi4fgzadg=
 github.com/VitruvianSoftware/pulumi-library/go/pkg/network/v2 v2.1.1/go.mod h1:75VpfClq+nP6cND2qPcT0foPJ2k9onCn8PZTDAuzshM=
-github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.2 h1:SDqkkSArop8MK9wzESw+1JqOE282cB8ku9SowwUYWkQ=
-github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.2/go.mod h1:iomobDL3f/YLmhazoesfr+zA2iSPAVEp3+eNItzsixE=
+github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.3 h1:bO+7Ka3o6r7rcruM9DPLgR1fv2T2zfDAe5tGeo/TPpI=
+github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.3/go.mod h1:F2BqNFqbVnweW9uPeCSscHDAmIYtrB2CjI/qLuWd4sc=
 github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da h1:KjTM2ks9d14ZYCvmHS9iAKVt9AyzRSqNU1qabPih5BY=
 github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da/go.mod h1:eHEWzANqSiWQsof+nXEI9bUVUyV6F53Fp89EuCh2EAA=
 github.com/agext/levenshtein v1.2.3 h1:YB2fHEn0UJagG8T1rrWknE3ZQzWM06O8AMAatNn7lmo=
