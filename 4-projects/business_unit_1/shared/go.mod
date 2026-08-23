@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	foundation-4-projects/modules v0.0.0-00010101000000-000000000000
-	github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.2
+	github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.3
 	github.com/pulumi/pulumi/sdk/v3 v3.257.0
 	github.com/stretchr/testify v1.12.0
 )
@@ -13,7 +13,6 @@ require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
-	github.com/VitruvianSoftware/pulumi-library/go v0.5.1 // indirect
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
@@ -74,6 +73,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/term v1.1.0 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
+	github.com/pulumi/pulumi-command/sdk v1.2.1 // indirect
 	github.com/pulumi/pulumi-gcp/sdk/v9 v9.34.1 // indirect
 	github.com/pulumi/pulumi-random/sdk/v4 v4.21.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
@@ -119,5 +119,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
+
+
+
 
 replace foundation-4-projects/modules => ../../modules
