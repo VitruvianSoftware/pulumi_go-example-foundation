@@ -7,7 +7,7 @@ require (
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/org_policy v1.0.2
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.3
 	github.com/pulumi/pulumi-command/sdk v1.2.1
-	github.com/pulumi/pulumi-gcp/sdk/v9 v9.35.0
+	github.com/pulumi/pulumi-gcp/sdk/v9 v9.35.1
 	github.com/pulumi/pulumi-random/sdk/v4 v4.21.1
 	github.com/pulumi/pulumi/sdk/v3 v3.259.0
 	github.com/pulumiverse/pulumi-time/sdk v0.1.0
@@ -129,3 +129,8 @@ require (
 )
 
 replace foundation-1-org/modules => ../../modules
+
+
+
+
+
