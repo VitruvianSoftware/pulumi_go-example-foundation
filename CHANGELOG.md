@@ -5,6 +5,13 @@ All notable changes to the Pulumi Example Foundation (Go) will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1](https://github.com/VitruvianSoftware/pulumi_go-example-foundation/compare/v1.0.0...v1.0.1) (2026-09-02)
+
+
+### Bug Fixes
+
+* **ci:** build every module in a stage, not a stage that is not a module ([#88](https://github.com/VitruvianSoftware/pulumi_go-example-foundation/issues/88)) ([e733a0c](https://github.com/VitruvianSoftware/pulumi_go-example-foundation/commit/e733a0ceebbdcb1c767e1b5355d6a40443fa3fc4))
+
 ## 1.0.0 (2026-07-05)
 
 
