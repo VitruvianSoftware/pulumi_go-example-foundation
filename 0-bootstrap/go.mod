@@ -1,6 +1,6 @@
 module foundation-0-bootstrap
 
-go 1.26.2
+go 1.26.6
 
 require (
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/bootstrap/v2 v2.1.4
@@ -129,3 +129,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.5.1 // indirect
 )
+
+
+
+
+
+
+
