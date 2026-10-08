@@ -5,7 +5,7 @@ go 1.26.6
 require (
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/network/v2 v2.1.1
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/vpc_service_controls v1.0.2
-	github.com/pulumi/pulumi-gcp/sdk/v9 v9.37.0
+	github.com/pulumi/pulumi-gcp/sdk/v9 v9.37.1
 	github.com/pulumi/pulumi/sdk/v3 v3.267.0
 	github.com/pulumiverse/pulumi-time/sdk v0.1.0
 )
@@ -122,3 +122,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
+
+
+

@@ -5,7 +5,7 @@ go 1.26.6
 require (
 	foundation-4-projects/modules v0.0.0-00010101000000-000000000000
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.3
-	github.com/pulumi/pulumi-gcp/sdk/v9 v9.37.0
+	github.com/pulumi/pulumi-gcp/sdk/v9 v9.37.1
 	github.com/pulumi/pulumi/sdk/v3 v3.267.0
 	github.com/stretchr/testify v1.12.1
 )
@@ -127,5 +127,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
+
+
+
 
 replace foundation-4-projects/modules => ../../modules
