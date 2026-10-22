@@ -12,8 +12,8 @@ require (
 	github.com/pulumi/pulumi-gcp/sdk/v9 v9.37.1
 	github.com/pulumi/pulumi-github/sdk/v6 v6.15.0
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.34.2
-	github.com/pulumi/pulumi-random/sdk/v4 v4.21.2
-	github.com/pulumi/pulumi/sdk/v3 v3.268.0
+	github.com/pulumi/pulumi-random/sdk/v4 v4.21.4
+	github.com/pulumi/pulumi/sdk/v3 v3.270.0
 	github.com/stretchr/testify v1.12.1
 )
 
@@ -130,3 +130,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.5.1 // indirect
 )
+
+
+
+
+
+
+
