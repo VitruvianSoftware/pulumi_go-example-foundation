@@ -127,6 +127,3 @@ require (
 )
 
 replace foundation-3-networks-hub-and-spoke/modules => ../../modules
-
-
-
