@@ -1,6 +1,6 @@
 module foundation-3-networks-hub-and-spoke/modules
 
-go 1.26.6
+go 1.26.10
 
 require (
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/network/v2 v2.1.1
@@ -121,3 +121,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
+
+
+

@@ -1,6 +1,6 @@
 module foundation-2-environments/modules
 
-go 1.26.6
+go 1.26.10
 
 require (
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.3
@@ -121,3 +121,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
+
+

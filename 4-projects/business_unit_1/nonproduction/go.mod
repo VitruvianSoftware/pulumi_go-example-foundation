@@ -1,6 +1,6 @@
 module foundation-4-projects-bu1-nonproduction
 
-go 1.26.6
+go 1.26.10
 
 require (
 	foundation-4-projects/modules v0.0.0-00010101000000-000000000000
@@ -126,5 +126,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
+
+
+
 
 replace foundation-4-projects/modules => ../../modules
