@@ -6,7 +6,7 @@ require (
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/cai_monitoring v1.0.2
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/centralized_logging v1.0.2
 	github.com/VitruvianSoftware/pulumi-library/go/pkg/project_factory v1.0.3
-	github.com/pulumi/pulumi-gcp/sdk/v9 v9.37.1
+	github.com/pulumi/pulumi-gcp/sdk/v9 v9.37.2
 	github.com/pulumi/pulumi/sdk/v3 v3.273.0
 )
 
@@ -79,7 +79,7 @@ require (
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
 	github.com/pulumi/pulumi-cloud-sdk/go v1.20260918.0 // indirect
 	github.com/pulumi/pulumi-command/sdk v1.3.0 // indirect
-	github.com/pulumi/pulumi-random/sdk/v4 v4.21.4 // indirect
+	github.com/pulumi/pulumi-random/sdk/v4 v4.21.6 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.0.0 // indirect
@@ -123,3 +123,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
+
+
+
+
