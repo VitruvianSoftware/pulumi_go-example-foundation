@@ -8,7 +8,7 @@ require (
 	github.com/pulumi/pulumi-command/sdk v1.3.0
 	github.com/pulumi/pulumi-gcp/sdk/v9 v9.37.2
 	github.com/pulumi/pulumi-random/sdk/v4 v4.21.6
-	github.com/pulumi/pulumi/sdk/v3 v3.274.1
+	github.com/pulumi/pulumi/sdk/v3 v3.276.0
 )
 
 require (
@@ -122,3 +122,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
+
+
+
